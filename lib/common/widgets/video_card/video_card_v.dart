@@ -92,8 +92,10 @@ class VideoCardV extends StatelessWidget {
         Card(
           child: InkWell(
             onTap: onPushDetail,
-            onLongPress: onLongPress,
-            // M3：桌面右键=卡片操作菜单（与 ⋮ 同一动作集），长按仍=保存封面（触屏）。
+            // 桌面端解除“鼠标按住缩略图=封面预览/放大”；触屏长按行为保持不变。
+            // 桌面用空处理器“吞掉”该手势，避免按住后松手被解释成点击而误进详情。
+            onLongPress: PlatformUtils.isMobile ? onLongPress : () {},
+            // M3：桌面右键=卡片操作菜单（与 ⋮ 同一动作集）+「查看图片」。
             onSecondaryTap: null,
             onSecondaryTapDown: PlatformUtils.isMobile
                 ? null
@@ -102,6 +104,20 @@ class VideoCardV extends StatelessWidget {
                     globalPos: details.globalPosition,
                     videoItem: videoItem,
                     onRemove: onRemove,
+                    extraItems: [
+                      PopupMenuItem<dynamic>(
+                        height: 40,
+                        // 复用既有实现（与触屏长按同一入口），不新增图片查看器。
+                        onTap: onLongPress,
+                        child: const Row(
+                          children: [
+                            Icon(Icons.image_outlined, size: 20),
+                            SizedBox(width: 6),
+                            Text('查看图片', style: TextStyle(fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
             borderRadius: const .all(.circular(12)),
             child: Column(

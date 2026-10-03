@@ -186,8 +186,14 @@ abstract final class Pref {
   static double get smallCardWidth =>
       _setting.get(SettingBoxKey.smallCardWidth, defaultValue: 240.0);
 
+  /// 主页信息流卡片宽度目标（= 桌面端网格列宽上限）。
+  ///
+  /// 取 206 而非 240：最大化时正文限宽 [Style.contentMaxWidth] = 1480，
+  /// 240 会排成 6 列 × 240 —— 已有卡片从窗口态（client 1084 ⇒ 4 列 × 205.5）
+  /// 突增到 240（+17%），视觉上即“缩略图被百分比放大”；206 则排成
+  /// 7 列 × 204.6，与窗口态列宽基本一致，扩展空间由**新增列**承担。
   static double get recommendCardWidth =>
-      _setting.get(SettingBoxKey.recommendCardWidth, defaultValue: 240.0);
+      _setting.get(SettingBoxKey.recommendCardWidth, defaultValue: 206.0);
 
   static UpPanelPosition get upPanelPosition =>
       UpPanelPosition.values[_setting.get(

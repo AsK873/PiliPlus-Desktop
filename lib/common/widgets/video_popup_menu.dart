@@ -319,6 +319,8 @@ Future<void> showVideoContextMenu(
   required Offset globalPos,
   required BaseSimpleVideoItemModel videoItem,
   VoidCallback? onRemove,
+  /// 追加在共用动作之前的自定义条目；默认空 ⇒ 其它调用方行为完全不变。
+  List<PopupMenuEntry<dynamic>> extraItems = const [],
 }) async {
   final overlay = Overlay.maybeOf(context)?.context.findRenderObject();
   if (overlay is! RenderBox) return;
@@ -331,11 +333,14 @@ Future<void> showVideoContextMenu(
       local.dx,
       local.dy,
     ),
-    items: buildVideoPopupMenuEntries(
-      context: context,
-      videoItem: videoItem,
-      onRemove: onRemove,
-    ).cast<PopupMenuEntry<dynamic>>(),
+    items: [
+      ...extraItems,
+      ...buildVideoPopupMenuEntries(
+        context: context,
+        videoItem: videoItem,
+        onRemove: onRemove,
+      ).cast<PopupMenuEntry<dynamic>>(),
+    ],
   );
 }
 
