@@ -14,7 +14,7 @@
   <img src="https://github.com/user-attachments/assets/3d2a7494-9d44-40e2-957e-01ba99d7e888" width="49%" />
 </p>
     </p>
-<img width="2560" height="1392" alt="屏幕截图 2026-10-04 084122" src="https://github.com/user-attachments/assets/71013dc9-7d14-471d-bc96-0e42550f7686" />
+<img width="https://github.com/user-attachments/assets/243c43ff-596d-4f08-8ccf-835b27829473" />
 
 
 
