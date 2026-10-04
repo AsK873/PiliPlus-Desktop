@@ -718,10 +718,13 @@ class _AudioPageState extends State<AudioPage> {
                 FontAwesomeIcons.solidStar,
               ),
               onTap: () => _controller.showFavBottomSheet(context),
-              onLongPress: () => _controller.showFavBottomSheet(
-                context,
-                isLongPress: true,
-              ),
+              // 桌面端长按 = 无动作（收藏面板仍由点击打开）
+              onLongPress: PlatformUtils.isMobile
+                  ? () => _controller.showFavBottomSheet(
+                      context,
+                      isLongPress: true,
+                    )
+                  : null,
               selectStatus: _controller.hasFav.value,
               semanticsLabel: '收藏',
               text: NumUtils.numFormat(

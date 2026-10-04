@@ -361,10 +361,13 @@ class _LivePageState extends State<LivePage>
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => PageUtils.toLiveRoom(item.roomid),
-                      onLongPress: () {
-                        Feedback.forLongPress(context);
-                        Get.toNamed('/member?mid=${item.uid}');
-                      },
+                      // 桌面端长按 = 无动作（进 UP 主空间仍由下方右键提供）
+                      onLongPress: PlatformUtils.isMobile
+                          ? () {
+                              Feedback.forLongPress(context);
+                              Get.toNamed('/member?mid=${item.uid}');
+                            }
+                          : null,
                       onSecondaryTap: PlatformUtils.isMobile
                           ? null
                           : () => Get.toNamed('/member?mid=${item.uid}'),

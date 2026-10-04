@@ -98,7 +98,7 @@ class _SysMsgPageState extends State<SysMsgPage> {
               );
               return ListTile(
                 safeArea: true,
-                onLongPress: onLongPress,
+                onLongPress: PlatformUtils.isMobile ? onLongPress : null,
                 onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
                 title: Text(
                   "${item.title}",

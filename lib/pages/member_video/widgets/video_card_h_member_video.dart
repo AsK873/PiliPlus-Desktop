@@ -43,7 +43,7 @@ class VideoCardHMemberVideo extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           InkWell(
-            onLongPress: onLongPress,
+            onLongPress: PlatformUtils.isMobile ? onLongPress : null,
             onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
             onTap:
                 onTap ??

@@ -24,11 +24,23 @@ class VideoCardV extends StatelessWidget {
   final BaseRcmdVideoItemModel videoItem;
   final VoidCallback? onRemove;
 
+  /// 卡片整体缩放系数（= 卡片宽度 / 206 设计基准），由调用方按实际列宽算出
+  /// （见 `pages/rcmd/view.dart` 的 `_HomeGridDelegate.widthFor`）。
+  ///
+  /// 只作用于**文字**：通过 [MediaQuery.textScaler] 与系统/用户字号设置
+  /// （ambient [TextScaler]）**相乘**，因此标题、UP 主、播放量、弹幕、日期、
+  /// 角标文字的字号一起随卡片同比放大，而字体、maxLines、ellipsis、文字内容、
+  /// 卡片内部布局逻辑与缩略图比例都不参与、不受影响。
+  ///
+  /// 默认 1.0 ⇒ 不引入任何额外布局层，其它调用方（搜索面板等）行为完全不变。
+  final double textScale;
+
   const VideoCardV({
     super.key,
     required this.videoItem,
     this.onRemove,
-  });
+    this.textScale = 1.0,
+  }) : assert(textScale > 0, 'textScale 必须为正数');
 
   Future<void> onPushDetail() async {
     switch (videoItem.goto) {
@@ -81,6 +93,27 @@ class VideoCardV extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final card = _card(context);
+    if (textScale == 1.0) {
+      return card;
+    }
+    // 文字随卡片同比放大：与用户字号设置相乘，不改任何 TextStyle / 字体 /
+    // maxLines / ellipsis / 文字内容，也不触碰卡片内部布局与缩略图比例。
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        textScaler: _ScaledTextScaler(
+          MediaQuery.textScalerOf(context),
+          textScale,
+        ),
+      ),
+      child: card,
+    );
+  }
+
+  /// 卡片本体（缩略图 + 信息区 + 全部交互）。相较改动前逐字未变，只是从
+  /// [build] 抽出：便于外层按 [textScale] 包裹 [MediaQuery]，且右下角 ⋮ 菜单
+  /// （桌面端本就不渲染）不受文字缩放影响。
+  Widget _card(BuildContext context) {
     void onLongPress() => imageSaveDialog(
       title: videoItem.title,
       cover: videoItem.cover,
@@ -92,9 +125,11 @@ class VideoCardV extends StatelessWidget {
         Card(
           child: InkWell(
             onTap: onPushDetail,
-            // 桌面端解除“鼠标按住缩略图=封面预览/放大”；触屏长按行为保持不变。
-            // 桌面用空处理器“吞掉”该手势，避免按住后松手被解释成点击而误进详情。
-            onLongPress: PlatformUtils.isMobile ? onLongPress : () {},
+            // 桌面端（含 Windows）：长按 = 无动作 —— 既不开图片/操作菜单，也不需要
+            // 空处理器去挡手势；`null` ⇒ LongPressGestureRecognizer 不参与手势竞争，
+            // 按住后松手仍是普通点击；触屏长按（保存/查看封面）保持不变。
+            // 鼠标右键菜单由下方 onSecondaryTapDown 提供，不受影响。
+            onLongPress: PlatformUtils.isMobile ? onLongPress : null,
             // M3：桌面右键=卡片操作菜单（与 ⋮ 同一动作集）+「查看图片」。
             onSecondaryTap: null,
             onSecondaryTapDown: PlatformUtils.isMobile
@@ -285,4 +320,29 @@ class VideoCardV extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 把环境 [TextScaler]（系统/用户字号设置）再乘一个固定系数，用于「文字随卡片
+/// 宽度同比放大」：最终字号 = 原字号 × 用户字号系数 × [factor]。
+///
+/// 只叠加、不替换环境缩放，因此用户字号设置仍然生效；字号、字体、maxLines、
+/// ellipsis、文字内容都不需要改动，全部 Text（含 [StatWidget]、未显式传
+/// textScaler 的 PBadge 角标）自然跟随。
+class _ScaledTextScaler extends TextScaler {
+  const _ScaledTextScaler(this.ambient, this.factor);
+
+  final TextScaler ambient;
+  final double factor;
+
+  @override
+  double scale(double fontSize) => ambient.scale(fontSize) * factor;
+
+  /// [TextScaler] 契约里的「估算值」：本类只做线性叠加，故直接相乘即可。
+  /// 该成员自 v3.12 起废弃，但仍是抽象接口的一部分，必须实现。
+  @override
+  // ignore: deprecated_member_use
+  double get textScaleFactor => ambient.textScaleFactor * factor;
+
+  @override
+  String toString() => '_ScaledTextScaler($ambient, $factor)';
 }

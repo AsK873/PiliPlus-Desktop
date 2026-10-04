@@ -47,7 +47,7 @@ class FavPgcItem extends StatelessWidget {
               }
               PageUtils.viewPgc(seasonId: item.seasonId);
             },
-            onLongPress: onLongPress,
+            onLongPress: PlatformUtils.isMobile ? onLongPress : null,
             onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
             child: Padding(
               padding: const EdgeInsets.symmetric(

@@ -3,6 +3,7 @@ import 'package:PiliPlus/common/widgets/image/image_save.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/models_new/fav/fav_folder/list.dart';
 import 'package:PiliPlus/utils/bili_utils.dart';
+import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:material_ui/material_ui.dart';
 
 class FavVideoItem extends StatelessWidget {
@@ -21,18 +22,19 @@ class FavVideoItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 长按操作：优先用调用方传入的 onLongPress，否则回落到「保存/查看封面」
+    final longPress =
+        onLongPress ??
+        (onTap == null
+            ? null
+            : () => imageSaveDialog(title: item.title, cover: item.cover));
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
         onTap: onTap,
-        onLongPress:
-            onLongPress ??
-            (onTap == null
-                ? null
-                : () => imageSaveDialog(
-                    title: item.title,
-                    cover: item.cover,
-                  )),
+        // 桌面端长按 = 无动作（同一操作仍由下方右键 onSecondaryTap 提供）
+        onLongPress: PlatformUtils.isMobile ? longPress : null,
+        onSecondaryTap: PlatformUtils.isMobile ? null : longPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           child: Row(

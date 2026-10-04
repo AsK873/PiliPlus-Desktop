@@ -113,6 +113,21 @@ class MemberController extends CommonDataController<SpaceData, SpaceData?>
       hasSeasonOrSeries = true;
     }
     tab2?.retainWhere((item) => MemberTabType.contains(item.param!));
+    // 个人主页一级 Tab「合集和系列」：仅当该 UP 主确实有合集/系列时补入。
+    // 内容全部复用既有 member_season_series（SeasonSeriesPage +
+    // SeasonSeriesController + MemberHttp.seasonSeriesList），此处只负责把入口
+    // 补到 Tab 列表末尾 —— 因此既有四个 Tab 的顺序与内容完全不受影响。
+    // 若服务端已下发同名 param，则不重复追加。
+    if (hasSeasonOrSeries == true &&
+        tab2?.any((item) => item.param == MemberTabType.ugcSeason.name) ==
+            false) {
+      tab2?.add(
+        const SpaceTab2(
+          title: MemberTabType.ugcSeasonTitle,
+          param: 'ugcSeason',
+        ),
+      );
+    }
     if (tab2?.isNotEmpty == true) {
       if (data.hasItem != true && tab2!.first.param == 'home') {
         // remove empty home tab

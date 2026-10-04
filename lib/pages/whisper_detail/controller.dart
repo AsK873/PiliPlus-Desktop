@@ -16,7 +16,31 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// 桌面 Drawer 模式显式传入的会话参数；为 null 的项回落到路由 arguments。
+class _DrawerArgs {
+  const _DrawerArgs(this.talkerId, this.name, this.face, this.mid, this.isLive);
+
+  final int? talkerId;
+  final String? name;
+  final String? face;
+  final int? mid;
+  final bool? isLive;
+}
+
 class WhisperDetailController extends CommonListController<RspSessionMsg, Msg> {
+  /// 两种进入方式共用本控制器：
+  /// - **Drawer 模式**（桌面端右侧抽屉）：由 `WhisperDetailPage` 显式传入 5 个参数；
+  /// - **普通路由模式**：保持原有 `Get.arguments` 取值逻辑不变（构造参数为空时兜底）。
+  WhisperDetailController({
+    int? talkerId,
+    String? name,
+    String? face,
+    int? mid,
+    bool? isLive,
+  }) : _drawer = _DrawerArgs(talkerId, name, face, mid, isLive);
+
+  final _DrawerArgs _drawer;
+
   late final account = Accounts.main;
 
   late final int talkerId;
@@ -33,12 +57,14 @@ class WhisperDetailController extends CommonListController<RspSessionMsg, Msg> {
   @override
   void onInit() {
     super.onInit();
+    // Drawer 模式优先用构造参数；普通路由模式继续读路由 arguments（与原实现一致）
     final args = Get.arguments;
-    talkerId = args['talkerId'];
-    name = args['name'];
-    face = args['face'];
-    mid = args['mid'];
-    isLive = args['isLive'] ?? false;
+    final Map? routeArgs = args is Map ? args : null;
+    talkerId = _drawer.talkerId ?? routeArgs?['talkerId'];
+    name = _drawer.name ?? routeArgs?['name'];
+    face = _drawer.face ?? routeArgs?['face'];
+    mid = _drawer.mid ?? routeArgs?['mid'];
+    isLive = _drawer.isLive ?? routeArgs?['isLive'] ?? false;
     queryData();
   }
 

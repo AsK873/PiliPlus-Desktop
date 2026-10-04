@@ -1,6 +1,7 @@
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/models_new/follow/list.dart';
+import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -15,6 +16,9 @@ class FollowTypeItem extends StatelessWidget {
 
   final FollowItemModel item;
   final VoidCallback? onTap;
+
+  /// 长按回调（**仅触屏生效**：桌面端长按 = 无动作，同一操作由 [onSecondaryTap]
+  /// 的右键菜单承担）。
   final VoidCallback? onLongPress;
   final VoidCallback? onSecondaryTap;
 
@@ -24,7 +28,8 @@ class FollowTypeItem extends StatelessWidget {
       height: 66,
       child: InkWell(
         onTap: onTap ?? () => Get.toNamed('/member?mid=${item.mid}'),
-        onLongPress: onLongPress,
+        // 桌面端长按 = 无动作（保持 onSecondaryTap 的右键行为不变）
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: onSecondaryTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(

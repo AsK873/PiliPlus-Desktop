@@ -269,7 +269,7 @@ class _LikeMePageState extends State<LikeMePage> {
         }
         PiliScheme.routePushFromUrl(nativeUri);
       },
-      onLongPress: onLongPress,
+      onLongPress: PlatformUtils.isMobile ? onLongPress : null,
       onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
       leading: avatar,
       title: Text.rich(

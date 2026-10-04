@@ -118,7 +118,7 @@ class _AtMePageState extends State<AtMePage> {
                   }
                   PiliScheme.routePushFromUrl(nativeUri);
                 },
-                onLongPress: onLongPress,
+                onLongPress: PlatformUtils.isMobile ? onLongPress : null,
                 onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
                 leading: GestureDetector(
                   onTap: () => Get.toNamed('/member?mid=${item.user?.mid}'),

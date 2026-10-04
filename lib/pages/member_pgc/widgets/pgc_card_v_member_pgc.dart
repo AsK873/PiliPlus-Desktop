@@ -26,7 +26,7 @@ class PgcCardVMemberPgc extends StatelessWidget {
       child: InkWell(
         borderRadius: Style.mdRadius,
         onTap: () => PageUtils.viewPgc(seasonId: item.param),
-        onLongPress: onLongPress,
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -328,10 +328,13 @@ class _MediaPageState extends CommonPageState<MinePage>
           GestureDetector(
             behavior: .opaque,
             onTap: controller.onLogin,
-            onLongPress: () {
-              Feedback.forLongPress(context);
-              controller.onLogin(true);
-            },
+            // 桌面端长按 = 无动作（切换账号仍由下方右键 onSecondaryTap 提供）
+            onLongPress: PlatformUtils.isMobile
+                ? () {
+                    Feedback.forLongPress(context);
+                    controller.onLogin(true);
+                  }
+                : null,
             onSecondaryTap: PlatformUtils.isMobile
                 ? null
                 : () => controller.onLogin(true),
@@ -1282,10 +1285,13 @@ class _MediaPageState extends CommonPageState<MinePage>
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: controller.onLogin,
-      onLongPress: () {
-        Feedback.forLongPress(context);
-        controller.onLogin(true);
-      },
+      // 桌面端长按 = 无动作（切换账号仍由下方右键 onSecondaryTap 提供）
+      onLongPress: PlatformUtils.isMobile
+          ? () {
+              Feedback.forLongPress(context);
+              controller.onLogin(true);
+            }
+          : null,
       onSecondaryTap: () => controller.onLogin(true),
       child: child,
     );

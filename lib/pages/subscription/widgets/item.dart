@@ -55,7 +55,7 @@ class SubItem extends StatelessWidget {
             );
           }
         },
-        onLongPress: onLongPress,
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),

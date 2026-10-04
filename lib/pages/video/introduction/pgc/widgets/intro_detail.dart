@@ -10,6 +10,7 @@ import 'package:PiliPlus/pages/common/slide/common_slide_page.dart';
 import 'package:PiliPlus/pages/pgc_review/view.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
+import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -201,7 +202,9 @@ class _IntroDetailState extends State<PgcIntroPanel>
                       '/searchResult',
                       parameters: {'keyword': tagName},
                     ),
-                    onLongPress: Utils.copyText,
+                    onLongPress: PlatformUtils.isMobile
+                        ? Utils.copyText
+                        : null,
                   ),
                 )
                 .toList(),

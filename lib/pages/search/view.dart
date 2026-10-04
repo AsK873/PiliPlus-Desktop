@@ -13,6 +13,7 @@ import 'package:PiliPlus/pages/search/widgets/hot_keyword.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
 import 'package:PiliPlus/utils/em.dart' show Em;
 import 'package:PiliPlus/utils/extension/size_ext.dart';
+import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -357,7 +358,10 @@ class _SearchPageState extends State<SearchPage> {
                   (context, index) => SearchText(
                     text: list[index],
                     onTap: _searchController.onClickKeyword,
-                    onLongPress: _searchController.onLongSelect,
+                    // 桌面端长按 = 无动作（长按删除单条历史仅在触屏保留）
+                    onLongPress: PlatformUtils.isMobile
+                        ? _searchController.onLongSelect
+                        : null,
                     height: 1,
                     maxLines: 1,
                     fontSize: 14,

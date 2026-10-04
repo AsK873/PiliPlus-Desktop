@@ -182,7 +182,7 @@ class _MediaListPanelState extends State<MediaListPanel>
               Get.back();
               widget.onChangeEpisode(item);
             },
-            onLongPress: onLongPress,
+            onLongPress: PlatformUtils.isMobile ? onLongPress : null,
             onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
             child: Stack(
               clipBehavior: Clip.none,
@@ -295,7 +295,10 @@ class _MediaListPanelState extends State<MediaListPanel>
                         title: const Text('确定移除该视频？'),
                         onConfirm: () => widget.onDelete!(item, index),
                       ),
-                      onLongPress: () => widget.onDelete!(item, index),
+                      // 桌面端长按 = 无动作（防误触直接删除，删除仍走点击确认弹窗）
+                      onLongPress: PlatformUtils.isMobile
+                          ? () => widget.onDelete!(item, index)
+                          : null,
                       child: Padding(
                         padding: const EdgeInsets.all(9),
                         child: Icon(

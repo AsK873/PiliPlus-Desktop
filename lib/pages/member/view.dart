@@ -16,6 +16,7 @@ import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/user.dart';
 import 'package:PiliPlus/models_new/live/live_medal_wall/data.dart';
 import 'package:PiliPlus/models_new/space/space/reservation_card_list.dart';
+import 'package:PiliPlus/models_new/space/space/data.dart';
 import 'package:PiliPlus/pages/coin_log/controller.dart';
 import 'package:PiliPlus/pages/exp_log/controller.dart';
 import 'package:PiliPlus/pages/log_table/view.dart';
@@ -32,6 +33,7 @@ import 'package:PiliPlus/pages/member_dynamics/view.dart';
 import 'package:PiliPlus/pages/member_favorite/view.dart';
 import 'package:PiliPlus/pages/member_home/view.dart';
 import 'package:PiliPlus/pages/member_pgc/view.dart';
+import 'package:PiliPlus/pages/member_season_series/view.dart';
 import 'package:PiliPlus/pages/member_shop/view.dart';
 import 'package:PiliPlus/pages/member_video_web/archive/view.dart';
 import 'package:PiliPlus/pages/member_video_web/season_series/view.dart';
@@ -51,7 +53,11 @@ import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
 class MemberPage extends StatefulWidget {
-  const MemberPage({super.key});
+  const MemberPage({super.key, this.mid});
+
+  /// 桌面端就地承载（例如私信页右侧半屏抽屉）时显式传入 mid；
+  /// 为空时沿用原有路由查询参数 `/member?mid=…`，路由行为与之前完全一致。
+  final int? mid;
 
   @override
   State<MemberPage> createState() => _MemberPageState();
@@ -68,7 +74,7 @@ class _MemberPageState extends State<MemberPage> {
   @override
   void initState() {
     super.initState();
-    _mid = int.tryParse(Get.parameters['mid']!) ?? -1;
+    _mid = widget.mid ?? int.tryParse(Get.parameters['mid']!) ?? -1;
     _heroTag = Utils.makeHeroTag(_mid);
     _userController = Get.put(
       MemberController(mid: _mid),
@@ -85,8 +91,219 @@ class _MemberPageState extends State<MemberPage> {
     super.dispose();
   }
 
+  /// 桌面端布局阈值（内容区可用宽度）：>= 该值时个人主页走宽屏布局
+  /// （静态横排信息区 + 左对齐页签 + 多列内容），否则沿用手机/平板布局。
+  /// 取 700 与 `MainLayout` 侧栏下的最小正文宽（960 − 216 = 744）同量级，
+  /// 保证正常窗口即进入桌面布局，而窄抽屉/半屏承载时不会挤压手机布局。
+  static const double _kDesktopMinWidth = 700;
+
+  /// 桌面端页签行高度（TabBar 45 + 上下留白 1），与 `pinnedHeaderSliverHeightBuilder`
+  /// 配套使用，避免内容区顶部被页签遮挡。
+  static const double _kDesktopTabsHeight = 46;
+
+  /// 桌面端正文最大宽度 = 全桌面唯一来源（`Style.contentMaxWidth` = 1480）。
+  /// 只用于**超宽屏**上限，不做手机式收窄：宽度不够时正文照常铺满可用空间。
+  static const double _kDesktopContentMaxWidth = DesktopTokens.contentWidth;
+
   @override
   Widget build(BuildContext context) {
+    // 手机 / 平板：完全沿用原布局（下面 _buildMobile 内是原 build 的逐字内容）。
+    // `MediaQuery.removePadding` 保持原 build 的返回值形状（原 build 末尾正是
+    // 这个包裹），因此非桌面端视觉零变化的同时，桌面端不会重复扣减 viewPadding。
+    final mobile = Builder(
+      builder: (_) => MediaQuery.removePadding(
+        context: context,
+        child: _buildMobile(context),
+      ),
+    );
+    if (!PlatformUtils.isDesktop) {
+      return mobile;
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!constraints.hasBoundedWidth ||
+            constraints.maxWidth < _kDesktopMinWidth) {
+          return mobile;
+        }
+        final theme = Theme.of(context).colorScheme;
+        return Material(
+          color: theme.surface,
+          child: Obx(
+            () => switch (_userController.loadingState.value) {
+              Loading() => m3eLoading,
+              Success(:final response) => _buildDesktopBody(
+                context,
+                theme,
+                response,
+              ),
+              Error(:final errMsg) => scrollErrorWidget(
+                errMsg: errMsg,
+                onReload: _userController.onReload,
+              ),
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  /// 桌面端个人主页：单个外层滚动容器（[ExtendedNestedScrollView]）承载
+  /// 「顶部操作栏 → 个人信息区 → 页签 → 当前 Tab 内容」四段，各段排列方式：
+  ///
+  /// * 顶部操作栏：固定 56 高的 `AppBar`（用户名 + 原有 actions），滚动时吸顶，
+  ///   不占用额外垂直空间（无手机端 135 高头图占位）；
+  /// * 个人信息区：`UserInfoCard` 的**横排**布局（头像 + 身份/签名/数据一行 +
+  ///   统计与关注按钮），左对齐贴在最大 1480 的内容宽度内；
+  /// * 页签：`SliverPinnedHeader` + `TabBar`，`isScrollable` + `TabAlignment.start`
+  ///   ⇒ 横向排列、整体左对齐、不平均铺满；选中态沿用 BoxDecoration 胶囊
+  ///   （secondaryContainer + onSecondaryContainer，桌面端口径）；
+  /// * 内容区：`_buildBody` 原样复用（各 Tab 自己的多列网格，随可用宽度自适应列数）。
+  ///
+  /// 路由、点击逻辑、数据与交互全部复用既有实现，未新增任何业务分支。
+  Widget _buildDesktopBody(
+    BuildContext context,
+    ColorScheme theme,
+    SpaceData? response,
+  ) {
+    return ExtendedNestedScrollView(
+      onlyOneScrollInBody: true,
+      key: _userController.scrollKey,
+      scrollBehavior: const NoOverscrollIndicator(),
+      // 桌面端不吸顶「个人信息区」：钉住的高度只 = 顶部操作栏
+      // （`DynamicSliverAppBar` 的折叠高度 = topPadding + kToolbarHeight + 1）
+      pinnedHeaderSliverHeightBuilder: () =>
+          MediaQuery.viewPaddingOf(context).top + kToolbarHeight + 1,
+      headerSliverBuilder: (context, innerBoxIsScrolled) {
+        return [
+          if (response != null)
+            DynamicSliverAppBar.medium(
+              // 桌面端不使用折叠头图：flexibleSpace 必须是一个「不索取尺寸」的占位。
+              //
+              // 注意：这里**不能**用 `SizedBox.expand()`。`SliverPinnedHeader._rawLayout`
+              // 以无界高度（`constraints.asBoxConstraints()`）测量 AppBar，AppBar 内部
+              // Stack 会把 `0 ≤ h ≤ Infinity` 传给 flexibleSpace；`SizedBox.expand()`
+              // 要求「尽可能大」⇒ `Size(w, Infinity)` ⇒
+              // `RenderConstrainedBox object was given an infinite size during layout`
+              // ⇒ 首页首帧布局断言、整页黑屏（2026-10-05 修复）。
+              // `SizedBox.shrink()` 在两种约束下都安全地取 0，AppBar 高度自然收敛为
+              // 折叠高度（topPadding + kToolbarHeight + 1）。
+              flexibleSpace: const SizedBox.shrink(),
+              actions: _actions(theme),
+              title: Text(
+                _userController.username ?? '',
+                style: const TextStyle(
+                  fontSize: DesktopTokens.fontPageTitle,
+                ),
+              ),
+            )
+          else
+            SliverAppBar(
+              pinned: true,
+              actions: _actions(theme),
+              title: GestureDetector(
+                onTap: _userController.onReload,
+                behavior: HitTestBehavior.opaque,
+                child: Text(
+                  _userController.username ?? '',
+                  style: const TextStyle(
+                    fontSize: DesktopTokens.fontPageTitle,
+                  ),
+                ),
+              ),
+            ),
+          if (response != null)
+            SliverToBoxAdapter(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: _kDesktopContentMaxWidth,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      DesktopTokens.padPage,
+                      DesktopTokens.gap8,
+                      DesktopTokens.padPage,
+                      DesktopTokens.gap12,
+                    ),
+                    child: UserInfoCard(
+                      isOwner:
+                          _userController.mid == _userController.account.mid,
+                      relation: _userController.relation.value,
+                      card: response.card!,
+                      images: response.images!,
+                      onFollow: () => _userController.onFollow(context),
+                      live: _userController.live,
+                      silence: _userController.silence,
+                      headerControllerBuilder: getHeaderController,
+                      showLiveMedalWall: _showLiveMedalWall,
+                      charges: _userController.charges,
+                      chargeCount: _userController.chargeCount,
+                      guards: _userController.guards,
+                      guardCount: _userController.guardCount,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if ((_userController.tab2?.length ?? 0) > 1)
+            SliverToBoxAdapter(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: _kDesktopContentMaxWidth,
+                  ),
+                  child: SizedBox(
+                    height: _kDesktopTabsHeight,
+                    child: TabBar(
+                      controller: _userController.tabController,
+                      tabs: _userController.tabs,
+                      onTap: _userController.onTapTab,
+                      // 横向排列、整体左对齐、不平均铺满整页宽度
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      dividerColor: Colors.transparent,
+                      dividerHeight: 0,
+                      splashBorderRadius: BorderRadius.circular(20),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicatorPadding: const EdgeInsets.symmetric(
+                        horizontal: 2,
+                        vertical: 8,
+                      ),
+                      indicator: BoxDecoration(
+                        color: theme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      labelStyle: const TextStyle(
+                        fontSize: DesktopTokens.fontRowTitle,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontSize: DesktopTokens.fontRowTitle,
+                      ),
+                      labelColor: theme.onSecondaryContainer,
+                      unselectedLabelColor: theme.outline,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ];
+      },
+      // 内容区：各 Tab 自己的多列网格原样复用；仅在超宽屏时按桌面统一内容宽度
+      // 居中，避免卡片被无限拉宽（窄窗 / 半屏承载时 ConstrainedBox 不生效）。
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: _kDesktopContentMaxWidth,
+          ),
+          child: _buildBody,
+        ),
+      ),
+    );
+  }
+
+  /// 手机 / 平板布局（原实现逐字保留：折叠头图 + 信息卡 + 45 高页签 + 内容）。
+  Widget _buildMobile(BuildContext context) {
     final theme = Theme.of(context).colorScheme;
     final padding = MediaQuery.viewPaddingOf(context);
     return Material(
@@ -607,6 +824,13 @@ class _MemberPageState extends State<MemberPage> {
           heroTag: _heroTag,
           mid: _mid,
         ),
+        // 个人主页一级 Tab「合集和系列」：直接复用既有 member_season_series
+        // （SeasonSeriesPage → SeasonSeriesController → MemberHttp.seasonSeriesList
+        //  → SeasonSeriesCard 自适应网格），未新增任何数据/接口实现。
+        // heroTag 传 null：页面自身不使用 heroTag，且「投稿」Tab 内的
+        // `全部合集/列表` 子页签会用同一个 _heroTag 注册同类型的
+        // SeasonSeriesController，传 null 可彻底避免 Getx 同 tag 重复注册冲突。
+        'ugcSeason' => SeasonSeriesPage(mid: _mid),
         _ => Center(child: Text(item.title ?? '')),
       };
     }).toList(),

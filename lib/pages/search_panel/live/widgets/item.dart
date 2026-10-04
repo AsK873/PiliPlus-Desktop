@@ -22,7 +22,7 @@ class LiveItem extends StatelessWidget {
     return Card(
       child: InkWell(
         onTap: () => PageUtils.toLiveRoom(liveItem.roomid),
-        onLongPress: onLongPress,
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         borderRadius: const .all(.circular(12)),
         child: Column(

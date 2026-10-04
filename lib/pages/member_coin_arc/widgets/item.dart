@@ -53,7 +53,7 @@ class MemberCoinLikeItem extends StatelessWidget {
             }
           }
         },
-        onLongPress: onLongPress,
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         borderRadius: const .all(.circular(12)),
         child: Column(

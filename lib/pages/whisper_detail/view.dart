@@ -38,7 +38,28 @@ class WhisperDetailPage extends CommonRichTextPubPage {
   const WhisperDetailPage({
     super.key,
     super.autofocus = false,
+    this.talkerId,
+    this.name,
+    this.face,
+    this.mid,
+    this.isLive,
+    this.isDrawer = false,
+    this.onClose,
   });
+
+  /// 以下 5 项仅在**桌面右侧 Drawer** 模式显式传入；
+  /// 为空时（普通路由模式）控制器仍按原逻辑读取 `Get.arguments`。
+  final int? talkerId;
+  final String? name;
+  final String? face;
+  final int? mid;
+  final bool? isLive;
+
+  /// 是否由桌面端右侧 Drawer 承载（仅影响返回按钮：改为关闭 Drawer，而非 pop 路由）
+  final bool isDrawer;
+
+  /// Drawer 模式的关闭回调（关闭当前 Drawer）
+  final VoidCallback? onClose;
 
   @override
   State<WhisperDetailPage> createState() => _WhisperDetailPageState();
@@ -46,10 +67,36 @@ class WhisperDetailPage extends CommonRichTextPubPage {
 
 class _WhisperDetailPageState
     extends CommonRichTextPubPageState<WhisperDetailPage> {
-  final _whisperDetailController = Get.put(
-    WhisperDetailController(),
-    tag: Utils.makeHeroTag(Get.parameters['talkerId']),
-  );
+  /// 控制器注册 tag（与改动前保持同一算法：`Utils.makeHeroTag(...)`）
+  late final String _tag;
+  late final WhisperDetailController _whisperDetailController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tag = Utils.makeHeroTag(widget.talkerId ?? Get.parameters['talkerId']);
+    _whisperDetailController = Get.put(
+      WhisperDetailController(
+        talkerId: widget.talkerId,
+        name: widget.name,
+        face: widget.face,
+        mid: widget.mid,
+        isLive: widget.isLive,
+      ),
+      tag: _tag,
+    );
+  }
+
+  @override
+  void dispose() {
+    // 桌面 Drawer 模式没有路由可依赖（tag 每次随机，不会自动回收）：
+    // 页面卸载时显式回收本会话控制器，避免残留/下一次打开出现旧会话。
+    // 普通路由模式仍由 GetX 路由生命周期管理，行为不变。
+    if (widget.isDrawer) {
+      Get.delete<WhisperDetailController>(tag: _tag);
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +108,12 @@ class _WhisperDetailPageState
     );
     return SimpleScaffold(
       appBar: AppBar(
+        // Drawer 模式：显式提供关闭按钮，关闭当前 Drawer（不 pop 根 /whisper 路由），
+        // 与私信页自身 `desktopEmbedded ? BackButton(onPressed: _handleBack) : null` 同款；
+        // 普通路由模式保持 leading 为 null（仍由框架给出默认返回箭头）。
+        leading: widget.isDrawer && widget.onClose != null
+            ? BackButton(onPressed: widget.onClose)
+            : null,
         title: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
@@ -173,7 +226,10 @@ class _WhisperDetailPageState
                   return ChatItem(
                     item: item,
                     eInfos: _whisperDetailController.eInfos,
-                    onLongPress: () => onLongPress(index, item, isOwner),
+                    // 桌面端长按 = 无动作（消息菜单仍由右键 onSecondaryTapUp 提供）
+                    onLongPress: PlatformUtils.isMobile
+                        ? () => onLongPress(index, item, isOwner)
+                        : null,
                     onSecondaryTapUp: PlatformUtils.isDesktop
                         ? (e) =>
                               _showMenu(e.globalPosition, index, item, isOwner)
@@ -241,6 +297,8 @@ class _WhisperDetailPageState
         content: isOwner
             ? ListTile(
                 onTap: () {
+                  // 关闭本弹窗（不是页面返回）：Drawer / 路由两种模式行为一致，
+                  // 均只 pop 掉这个 AlertDialog，不会影响 /whisper 路由或 Drawer。
                   Get.back();
                   _whisperDetailController.sendMsg(
                     message: '${item.msgKey}',
@@ -254,6 +312,7 @@ class _WhisperDetailPageState
               )
             : ListTile(
                 onTap: () {
+                  // 同上：只关闭弹窗，不影响 /whisper 路由或 Drawer
                   Get.back();
                   onReport(item);
                 },

@@ -77,7 +77,8 @@ class DynamicPanel extends StatelessWidget {
                 }.contains(item.type)
             ? null
             : () => PageUtils.pushDynDetail(item),
-        onLongPress: showMore,
+        // 桌面端长按 = 无动作（更多操作仍由下方右键 onSecondaryTap 提供）
+        onLongPress: PlatformUtils.isMobile ? showMore : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : showMore,
         child: Column(
           mainAxisSize: MainAxisSize.min,

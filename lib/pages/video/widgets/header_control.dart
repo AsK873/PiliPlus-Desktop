@@ -1588,7 +1588,10 @@ class HeaderControlState extends State<HeaderControl>
         return ListTile(
           dense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-          onLongPress: () => Utils.copyText(item.content.text),
+          // 桌面端长按 = 无动作（复制弹幕文本仍可由文本选择完成）
+          onLongPress: PlatformUtils.isMobile
+              ? () => Utils.copyText(item.content.text)
+              : null,
           title: Text(
             item.content.text,
             style: const TextStyle(fontSize: 14),
@@ -2046,10 +2049,13 @@ class HeaderControlState extends State<HeaderControl>
                       ),
                       selectIcon: const Icon(FontAwesomeIcons.solidStar),
                       onTap: () => introController.showFavBottomSheet(context),
-                      onLongPress: () => introController.showFavBottomSheet(
-                        context,
-                        isLongPress: true,
-                      ),
+                      // 桌面端长按 = 无动作（收藏面板仍由点击打开）
+                      onLongPress: PlatformUtils.isMobile
+                          ? () => introController.showFavBottomSheet(
+                              context,
+                              isLongPress: true,
+                            )
+                          : null,
                       selectStatus: introController.hasFav.value,
                       semanticsLabel: '收藏',
                     ),

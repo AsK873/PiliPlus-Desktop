@@ -424,6 +424,9 @@ class ReplyItemGrpc extends StatelessWidget {
                   )
                   .toList(),
               onViewImage: onViewImage,
+              // 评论区专用：点击缩略图 → 当前页面临时预览层
+              // （10% 灰遮罩 + 约 50% 可视面积的等比图片），不推全局预览路由。
+              commentPreview: true,
             ),
           ),
           const SizedBox(height: 4),

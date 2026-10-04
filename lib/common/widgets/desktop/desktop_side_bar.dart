@@ -243,6 +243,7 @@ class DesktopSideBar extends StatelessWidget {
     required this.colorScheme,
     required this.onSelect,
     this.onSelectShortcut,
+    this.onSelectMsg,
   });
 
   final MainController mainController;
@@ -252,6 +253,10 @@ class DesktopSideBar extends StatelessWidget {
   /// 快捷入口回调：宿主在桌面主内容区就地显示后返回 true（不走路由）；
   /// 返回 false / 未提供时，回退为原有 `Get.toNamed(entry.route)` 行为。
   final bool Function(DesktopNavEntry entry)? onSelectShortcut;
+
+  /// 账号区「消息」铃铛回调：宿主可改为「就地滑出面板」而不跳完整页面。
+  /// 未提供时保持原有 `Get.toNamed('/whisper')` 行为（移动端等不受影响）。
+  final VoidCallback? onSelectMsg;
 
   static const double width = _Dimens.width;
 
@@ -699,10 +704,17 @@ class DesktopSideBar extends StatelessWidget {
                 tooltip: '消息',
                 visualDensity: VisualDensity.compact,
                 onPressed: () {
+                  // 未标记已读的处理两个入口一致；呈现方式由宿主决定：
+                  // 桌面宿主改为就地滑出面板（与「私信」同一个面板），
+                  // 未提供回调时保持原有的完整页面跳转。
                   mainController
                     ..clearUnreadMsg()
                     ..lastCheckUnreadAt = DateTime.now().millisecondsSinceEpoch;
-                  Get.toNamed('/whisper');
+                  if (onSelectMsg != null) {
+                    onSelectMsg!();
+                  } else {
+                    Get.toNamed('/whisper');
+                  }
                 },
                 icon: Badge(
                   isLabelVisible:

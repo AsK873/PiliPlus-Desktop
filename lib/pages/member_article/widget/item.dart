@@ -29,7 +29,7 @@ class MemberArticleItem extends StatelessWidget {
             PiliScheme.routePushFromUrl(item.uri!);
           }
         },
-        onLongPress: onLongPress,
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(

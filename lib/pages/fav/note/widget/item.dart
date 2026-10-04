@@ -41,7 +41,7 @@ class FavNoteItem extends StatelessWidget {
             PageUtils.handleWebview(url, inApp: true);
           }
         },
-        onLongPress: onLongPress,
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(

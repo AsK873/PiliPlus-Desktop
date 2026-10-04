@@ -25,7 +25,7 @@ class SeasonSeriesCard extends StatelessWidget {
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
-        onLongPress: onLongPress,
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         onTap: onTap,
         child: Padding(

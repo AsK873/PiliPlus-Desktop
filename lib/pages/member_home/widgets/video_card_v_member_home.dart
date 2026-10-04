@@ -82,7 +82,7 @@ class VideoCardVMemberHome extends StatelessWidget {
     return Card(
       child: InkWell(
         onTap: onPushDetail,
-        onLongPress: onLongPress,
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         borderRadius: const .all(.circular(12)),
         child: Column(

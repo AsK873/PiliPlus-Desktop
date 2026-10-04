@@ -56,7 +56,7 @@ class ReplySearchItem extends StatelessWidget {
       type: MaterialType.transparency,
       child: InkWell(
         onTap: () => Get.back(result: (title: title, url: item.url)),
-        onLongPress: onLongPress,
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(

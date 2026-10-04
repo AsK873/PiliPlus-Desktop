@@ -42,7 +42,10 @@ class ChatItem extends StatelessWidget {
 
   final Msg item;
   final List<EmotionInfo>? eInfos;
-  final VoidCallback onLongPress;
+
+  /// 长按回调（**仅触屏生效**：桌面端长按 = 无动作，由 [onSecondaryTapUp] 的
+  /// 右键菜单承担同一套操作）。由调用方按 `PlatformUtils.isMobile` 传入。
+  final VoidCallback? onLongPress;
   final GestureTapUpCallback? onSecondaryTapUp;
   final bool isOwner;
 

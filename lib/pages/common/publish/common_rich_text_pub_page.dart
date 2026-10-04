@@ -130,10 +130,13 @@ abstract class CommonRichTextPubPageState<T extends CommonRichTextPubPage>
                 .toList(),
             initialPage: index,
           ),
-          onLongPress: () {
-            Feedback.forLongPress(context);
-            onClear();
-          },
+          // 桌面端长按 = 无动作（移除图片仍由下方右键 onSecondaryTap 提供）
+          onLongPress: PlatformUtils.isMobile
+              ? () {
+                  Feedback.forLongPress(context);
+                  onClear();
+                }
+              : null,
           onSecondaryTap: PlatformUtils.isMobile ? null : onClear,
           child: ClipRRect(
             borderRadius: const BorderRadius.all(Radius.circular(4)),

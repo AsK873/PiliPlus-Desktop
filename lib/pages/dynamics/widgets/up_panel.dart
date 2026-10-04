@@ -48,7 +48,8 @@ class _UpPanelState extends State<UpPanel> {
             onTap: () => setState(() {
               controller.showLiveUp = !controller.showLiveUp;
             }),
-            onLongPress: toFollowPage,
+            // 桌面端长按 = 无动作（进关注页仍由下方右键 onSecondaryTap 提供）
+            onLongPress: PlatformUtils.isMobile ? toFollowPage : null,
             onSecondaryTap: PlatformUtils.isMobile ? null : toFollowPage,
             child: Container(
               alignment: .center,
@@ -215,7 +216,8 @@ class _UpPanelState extends State<UpPanel> {
           }
         },
         // onDoubleTap: isLive ? () => _onSelect(data) : null,
-        onLongPress: !isAll ? toMemberPage : null,
+        // 桌面端长按 = 无动作（进 UP 主空间仍由下方右键 onSecondaryTap 提供）
+        onLongPress: !isAll && PlatformUtils.isMobile ? toMemberPage : null,
         onSecondaryTap: !isAll && !PlatformUtils.isMobile ? toMemberPage : null,
         child: Opacity(
           opacity: isCurrent ? 1 : 0.6,

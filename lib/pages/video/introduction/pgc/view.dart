@@ -18,6 +18,7 @@ import 'package:PiliPlus/pages/video/introduction/ugc/widgets/action_item.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
+import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -419,10 +420,13 @@ class _PgcIntroPageState extends State<PgcIntroPage> {
               icon: const Icon(FontAwesomeIcons.star),
               selectIcon: const Icon(FontAwesomeIcons.solidStar),
               onTap: () => introController.showFavBottomSheet(context),
-              onLongPress: () => introController.showFavBottomSheet(
-                context,
-                isLongPress: true,
-              ),
+              // 桌面端长按 = 无动作（收藏面板仍由点击打开）
+              onLongPress: PlatformUtils.isMobile
+                  ? () => introController.showFavBottomSheet(
+                      context,
+                      isLongPress: true,
+                    )
+                  : null,
               selectStatus: introController.hasFav.value,
               semanticsLabel: '收藏',
               text: NumUtils.numFormat(stat.favorite),

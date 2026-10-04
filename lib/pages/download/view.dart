@@ -311,7 +311,7 @@ class _DownloadPageState extends State<DownloadPage> with GridMixin {
             ),
           );
         },
-        onLongPress: onLongPress,
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(

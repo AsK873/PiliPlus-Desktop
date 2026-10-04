@@ -6,6 +6,7 @@ import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/desktop/desktop_search_panel.dart';
 import 'package:PiliPlus/common/widgets/desktop/desktop_shortcuts.dart';
 import 'package:PiliPlus/common/widgets/desktop/desktop_side_bar.dart';
+import 'package:PiliPlus/common/widgets/desktop/desktop_tokens.dart';
 import 'package:PiliPlus/main.dart' show windowMinimumSize;
 import 'package:PiliPlus/common/widgets/desktop/desktop_top_bar.dart';
 import 'package:PiliPlus/common/widgets/floating_navigation_bar.dart';
@@ -43,6 +44,19 @@ import 'package:window_manager/window_manager.dart';
 class MainApp extends StatefulWidget {
   const MainApp({super.key});
 
+  /// 侧栏「私信」面板宽度 = 当前**整个窗口可用宽度**的约 1/3。
+  ///
+  /// 不是侧栏宽度的 1/3、也不是内容区宽度的 1/3；再做合理上下限约束：
+  /// 下限 320 保证窄窗可用，上限 `contentWidth − 16` 保证面板不会铺满内容区。
+  /// 纯函数（不依赖 BuildContext），便于按窗口宽度直接验证。
+  static double whisperPanelWidth(double windowWidth) {
+    final double target = windowWidth / 3;
+    const double max = DesktopTokens.contentWidth - 16;
+    if (target < 320) return 320;
+    if (target > max) return max;
+    return target;
+  }
+
   @override
   State<MainApp> createState() => _MainAppState();
 }
@@ -63,6 +77,103 @@ class _MainAppState extends PopScopeState<MainApp>
   /// 桌面顶栏的搜索浮层是否展开
   bool _searchPanelOpen = false;
 
+  /// 桌面「私信 / 消息」面板（覆盖层，非路由页）。
+  ///
+  /// 侧栏「私信」磁贴与账号区「消息」铃铛**共用同一个面板宿主**：
+  /// 面板挂在内容区（左缘 = 侧栏右缘），宽度约为窗口 1/3，
+  /// 当前页面保持为背景、完全不重新布局。
+  ///
+  /// 采用**瞬时显示/隐藏**（无开关动画）：`true` 时面板直接以最终位置出现，
+  /// `false` 时立即从树上卸载。
+  bool _whisperPanelVisible = false;
+
+  /// 侧栏「私信 / 消息」面板宽度（= [MainApp.whisperPanelWidth]，基于窗口宽度）
+  double _whisperPanelWidth(BuildContext context) =>
+      MainApp.whisperPanelWidth(MediaQuery.sizeOf(context).width);
+
+  /// 两个入口共用：打开面板（立即显示）
+  void _openWhisperPanel() {
+    if (_whisperPanelVisible) return;
+    setState(() {
+      _whisperPanelVisible = true;
+      // 侧栏「私信」项的选中态复用既有 desktopContentRoute 机制
+      _mainController.desktopContentRoute.value = '/whisper';
+    });
+  }
+
+  /// 两个入口共用：关闭面板（立即隐藏）
+  void _closeWhisperPanel() {
+    if (!_whisperPanelVisible) return;
+    setState(() {
+      _whisperPanelVisible = false;
+      _mainController.desktopContentRoute.value = null;
+    });
+  }
+
+  /// 「私信」磁贴入口：点当前入口即关闭（再次点击切换状态）
+  void _toggleWhisperPanel() {
+    if (_whisperPanelVisible) {
+      _closeWhisperPanel();
+    } else {
+      _openWhisperPanel();
+    }
+  }
+
+  /// 账号区「消息」铃铛入口：点击即打开同一个面板（不关闭再打开）
+  void _openMsgPanel() {
+    _openWhisperPanel();
+  }
+
+  /// 「私信 / 消息」面板覆盖层（无动画，直接落在最终位置）。
+  ///
+  /// * 遮罩：只覆盖面板之外的内容区，点它即关闭；颜色沿用 `black @ 54%`；
+  /// * 面板：`Positioned(left: 0, width: 面板宽)` ⇒ 左缘恒等于内容区左缘
+  ///   = 侧栏右缘（侧栏宽 216），不做任何平移；
+  /// * 两个入口渲染同一个页面（二者在侧栏本来就指向同一功能）。
+  Widget _whisperPanel() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // 遮罩：点面板以外区域关闭
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _closeWhisperPanel,
+          child: ColoredBox(
+            color: Colors.black.withValues(alpha: 0.54),
+            child: const LimitedBox(
+              maxWidth: 0,
+              maxHeight: 0,
+              child: SizedBox.expand(),
+            ),
+          ),
+        ),
+        // 面板：左缘固定在内容区左缘（= 侧栏右缘），直接使用最终位置
+        Positioned(
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: _whisperPanelWidth(context),
+          child: Material(
+            color: DesktopTokens.surface(_colorScheme),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: const BorderRadius.horizontal(
+                right: Radius.circular(DesktopTokens.radius),
+              ),
+              side: BorderSide(color: DesktopTokens.divider(_colorScheme)),
+            ),
+            clipBehavior: Clip.hardEdge,
+            // 私信内容原样复用既有页面；面板内返回关闭面板。
+            child: WhisperPage(
+              desktopEmbedded: true,
+              onBack: _closeWhisperPanel,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   /// 顶栏搜索浮层状态（历史 / 联想；顶栏写入，浮层据此渲染）
   final ValueNotifier<DesktopSearchOverlayState> _searchOverlay = ValueNotifier(
     DesktopSearchOverlayState.empty,
@@ -75,6 +186,8 @@ class _MainAppState extends PopScopeState<MainApp>
   void initState() {
     super.initState();
     addObserverMobile(this);
+
+
     if (Platform.isMacOS) {
       HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     }
@@ -524,6 +637,11 @@ class _MainAppState extends PopScopeState<MainApp>
   /// 内容页才能拿到干净的控制器与滚动控制器（否则预览 dispose 会删掉内容页正在
   /// 用的控制器，例如 LaterBaseController）。
   bool _openDesktopShortcut(DesktopNavEntry entry) {
+    // 桌面「私信」：不走「主内容区就地打开完整页面」，改为从侧栏右缘滑出约 1/3 宽面板
+    if (PlatformUtils.isDesktop && entry.route == '/whisper') {
+      _toggleWhisperPanel();
+      return true;
+    }
     if (_mainController.desktopShortcutPreview.value != null) {
       _mainController.desktopShortcutPreview.value = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -580,6 +698,8 @@ class _MainAppState extends PopScopeState<MainApp>
         // 桌面主内容区就地承载的快捷入口（页面自带返回按钮 + 两级返回 + 侧键），
         // 与「我的」页快捷入口共用同一个闭包
         onSelectShortcut: _openDesktopShortcut,
+        // 账号区「消息」铃铛：与「私信」共用同一个侧滑面板，不再走完整路由页
+        onSelectMsg: _openMsgPanel,
       );
     }
     if (_mainController.navigationBars.length > 1) {
@@ -819,7 +939,23 @@ class _MainAppState extends PopScopeState<MainApp>
       child: MainLayout(
         sideBar: sideBar,
         bottomNav: bottomNav,
-        body: Padding(padding: padding, child: body),
+        body: Padding(
+          padding: padding,
+          // 桌面「私信」左侧面板：覆盖层，挂在**内容区**（侧栏右侧）之上 ⇒
+          // 侧栏位置/宽度不变、底层页面不重新布局、被挤到右边；遮罩只覆盖
+          // 内容区（面板以外区域），点它即关闭。Mobile / Tablet 不进入本分支。
+          child: PlatformUtils.isDesktop
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // 底层：原有内容区（保持静止：不重新布局、不被挤动）
+                    Positioned.fill(child: body),
+                    // 覆盖层：私信 / 消息面板（无动画，直接以最终位置出现）
+                    if (_whisperPanelVisible) _whisperPanel(),
+                  ],
+                )
+              : body,
+        ),
       ),
     );
 

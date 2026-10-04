@@ -22,6 +22,7 @@ import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/image_grid/image_grid_builder.dart';
+import 'package:PiliPlus/common/widgets/image_viewer/comment_image_preview.dart';
 import 'package:PiliPlus/common/widgets/image_viewer/gallery_viewer.dart';
 import 'package:PiliPlus/common/widgets/scaffold/mini_scaffold.dart';
 import 'package:PiliPlus/models/common/image_preview_type.dart';
@@ -70,16 +71,29 @@ class ImageGridView extends StatelessWidget {
     required this.picArr,
     this.onViewImage,
     this.fullScreen = false,
+    this.commentPreview = false,
   });
 
   final List<ImageModel> picArr;
   final VoidCallback? onViewImage;
   final bool fullScreen;
 
+  /// 评论区专用预览：点击缩略图后在**当前页面**叠加一层临时预览层
+  /// （10% 灰遮罩 + 约 50% 可视面积的等比图片），而不是推入全屏
+  /// [GalleryViewer] 路由。仅由评论区（reply_item_grpc）开启；
+  /// 默认 `false` ⇒ 其它所有调用方行为与之前完全一致。
+  final bool commentPreview;
+
   static bool horizontalPreview = Pref.horizontalPreview;
   static final _regex = RegExp(r'/videoV|/dynamicDetail$|/articlePage');
 
   void _onTap(BuildContext context, int index) {
+    // 评论区专用：当前页面内的临时预览层（不推路由、不改全局预览行为）
+    if (commentPreview) {
+      onViewImage?.call();
+      showCommentImagePreview(context, picArr: picArr, initialIndex: index);
+      return;
+    }
     final imgList = picArr.map(
       (item) {
         bool isLive = item.isLivePhoto;

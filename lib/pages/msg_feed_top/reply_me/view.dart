@@ -126,7 +126,7 @@ class _ReplyMePageState extends State<ReplyMePage> {
                     oid: item.item?.subjectId,
                   );
                 },
-                onLongPress: onLongPress,
+                onLongPress: PlatformUtils.isMobile ? onLongPress : null,
                 onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
                 leading: GestureDetector(
                   onTap: () => Get.toNamed('/member?mid=${item.user?.mid}'),

@@ -195,7 +195,8 @@ class _PgcReviewChildPageState extends State<PgcReviewChildPage>
                 },
               )
             : null,
-        onLongPress: !isLongReview ? showMore : null,
+        // 桌面端长按 = 无动作（展开/收起仍由下方右键 onSecondaryTap 提供）
+        onLongPress: !isLongReview && PlatformUtils.isMobile ? showMore : null,
         onSecondaryTap: !isLongReview && !PlatformUtils.isMobile
             ? showMore
             : null,

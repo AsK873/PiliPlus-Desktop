@@ -23,6 +23,17 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
 
+/// 桌面端：会话主体点击交给外层（私信页右侧抽屉）打开私信详情时的参数集合，
+/// 与原 `Get.toNamed('/whisperDetail', arguments: …)` 的 5 个键一一对应。
+typedef WhisperDetailTap =
+    void Function({
+      required int talkerId,
+      required String name,
+      required String face,
+      int? mid,
+      required bool isLive,
+    });
+
 class WhisperSessionItem extends StatelessWidget {
   const WhisperSessionItem({
     super.key,
@@ -30,12 +41,40 @@ class WhisperSessionItem extends StatelessWidget {
     required this.onSetTop,
     required this.onSetMute,
     required this.onRemove,
+    this.onTapAvatar,
+    this.onTapWhisperDetail,
   });
 
   final Session item;
   final Function(bool isTop, SessionId id) onSetTop;
   final Function(bool isMuted, Int64 talkerUid) onSetMute;
   final ValueChanged<int> onRemove;
+
+  /// 桌面端：由外层（私信页右侧半屏抽屉）接管头像点击；为空或移动端时
+  /// 仍走原有 `Get.toNamed('/member?mid=…')` 路由跳转，行为不变。
+  final ValueChanged<int>? onTapAvatar;
+
+  /// 桌面端：由外层（私信页右侧半屏抽屉）接管**私信会话主体**点击；
+  /// 参数与原 `/whisperDetail` 路由 arguments 完全一致。
+  /// 为空或移动端时仍走原有 `Get.toNamed('/whisperDetail', arguments: …)`。
+  final WhisperDetailTap? onTapWhisperDetail;
+
+  /// 桌面端：**头像**点击交给外层（私信页右侧半屏抽屉）打开该会话 UP 主主页；
+  /// 返回 true 表示已处理，调用方不再执行原有路由跳转。
+  ///
+  /// 会话主体（整行 `onTap`）**不使用本方法**：它保持原有语义
+  /// （清未读 → `/whisperDetail` / `WhisperSecPage` / `/sysMsg`）。
+  /// 移动端 / 平板、外层未传回调、或该会话没有 mid 时同样返回 false。
+  bool _tryOpenMemberDrawer() {
+    final onTapAvatar = this.onTapAvatar;
+    if (!PlatformUtils.isDesktop ||
+        onTapAvatar == null ||
+        !item.sessionInfo.avatar.hasMid()) {
+      return false;
+    }
+    onTapAvatar(item.sessionInfo.avatar.mid.toInt());
+    return true;
+  }
 
   Future<void> _updateAck(BuildContext context) async {
     final talkerUid = item.id.privateId.talkerUid;
@@ -81,51 +120,54 @@ class WhisperSessionItem extends StatelessWidget {
               alpha: theme.isDark ? 0.4 : 0.8,
             )
           : null,
-      onLongPress: () => showDialog(
-        context: context,
-        builder: (_) => SimpleDialog(
-          clipBehavior: .hardEdge,
-          contentPadding: const .symmetric(vertical: 12),
-          children: [
-            DialogOption(
-              onPressed: () {
-                Get.back();
-                onSetTop(item.isPinned, item.id);
-              },
-              child: Text(item.isPinned ? '移除置顶' : '置顶'),
-            ),
-            if (item.id.privateId.hasTalkerUid()) ...[
-              if (kDebugMode || item.hasUnread())
-                DialogOption(
-                  onPressed: () {
-                    Get.back();
-                    _updateAck(context);
-                  },
-                  child: const Text('标为已读'),
-                ),
-              DialogOption(
-                onPressed: () {
-                  Get.back();
-                  onSetMute(item.isMuted, item.id.privateId.talkerUid);
-                },
-                child: Text('${item.isMuted ? '关闭' : '开启'}免打扰'),
+      // 桌面端长按 = 无动作（会话操作菜单仍由下方右键 onSecondaryTapUp 提供）
+      onLongPress: PlatformUtils.isMobile
+          ? () => showDialog(
+              context: context,
+              builder: (_) => SimpleDialog(
+                clipBehavior: .hardEdge,
+                contentPadding: const .symmetric(vertical: 12),
+                children: [
+                  DialogOption(
+                    onPressed: () {
+                      Get.back();
+                      onSetTop(item.isPinned, item.id);
+                    },
+                    child: Text(item.isPinned ? '移除置顶' : '置顶'),
+                  ),
+                  if (item.id.privateId.hasTalkerUid()) ...[
+                    if (kDebugMode || item.hasUnread())
+                      DialogOption(
+                        onPressed: () {
+                          Get.back();
+                          _updateAck(context);
+                        },
+                        child: const Text('标为已读'),
+                      ),
+                    DialogOption(
+                      onPressed: () {
+                        Get.back();
+                        onSetMute(item.isMuted, item.id.privateId.talkerUid);
+                      },
+                      child: Text('${item.isMuted ? '关闭' : '开启'}免打扰'),
+                    ),
+                    DialogOption(
+                      onPressed: () {
+                        Get.back();
+                        showConfirmDialog(
+                          context: context,
+                          title: const Text('确定删除该对话？'),
+                          onConfirm: () =>
+                              onRemove(item.id.privateId.talkerUid.toInt()),
+                        );
+                      },
+                      child: const Text('删除'),
+                    ),
+                  ],
+                ],
               ),
-              DialogOption(
-                onPressed: () {
-                  Get.back();
-                  showConfirmDialog(
-                    context: context,
-                    title: const Text('确定删除该对话？'),
-                    onConfirm: () =>
-                        onRemove(item.id.privateId.talkerUid.toInt()),
-                  );
-                },
-                child: const Text('删除'),
-              ),
-            ],
-          ],
-        ),
-      ),
+            )
+          : null,
       onSecondaryTapUp: PlatformUtils.isDesktop
           ? (details) => showMenu(
               context: context,
@@ -187,14 +229,27 @@ class WhisperSessionItem extends StatelessWidget {
           }
         }
         if (item.id.privateId.hasTalkerUid()) {
+          final talkerId = item.id.privateId.talkerUid.toInt();
+          final hasMid = item.sessionInfo.avatar.hasMid();
+          final onTapWhisperDetail = this.onTapWhisperDetail;
+          if (PlatformUtils.isDesktop && onTapWhisperDetail != null) {
+            // 桌面端：同一个右侧半屏抽屉打开私信详情（5 个参数与原路由一致）
+            onTapWhisperDetail(
+              talkerId: talkerId,
+              name: item.sessionInfo.sessionName,
+              face: avatar,
+              mid: hasMid ? item.sessionInfo.avatar.mid.toInt() : null,
+              isLive: item.sessionInfo.isLive,
+            );
+            return;
+          }
           Get.toNamed(
             '/whisperDetail',
             arguments: {
-              'talkerId': item.id.privateId.talkerUid.toInt(),
+              'talkerId': talkerId,
               'name': item.sessionInfo.sessionName,
               'face': avatar,
-              if (item.sessionInfo.avatar.hasMid())
-                'mid': item.sessionInfo.avatar.mid.toInt(),
+              if (hasMid) 'mid': item.sessionInfo.avatar.mid.toInt(),
               'isLive': item.sessionInfo.isLive,
             },
           );
@@ -262,8 +317,13 @@ class WhisperSessionItem extends StatelessWidget {
 
           return GestureDetector(
             onTap: item.sessionInfo.avatar.hasMid()
-                ? () =>
-                      Get.toNamed('/member?mid=${item.sessionInfo.avatar.mid}')
+                ? () {
+                    // 桌面端与整行点击统一走同一个回调（右侧半屏抽屉）
+                    if (_tryOpenMemberDrawer()) {
+                      return;
+                    }
+                    Get.toNamed('/member?mid=${item.sessionInfo.avatar.mid}');
+                  }
                 : null,
             child: PendantAvatar(
               avatar,

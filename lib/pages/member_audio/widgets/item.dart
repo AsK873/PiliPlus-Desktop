@@ -30,7 +30,7 @@ class MemberAudioItem extends StatelessWidget {
           oid: item.id!,
           from: PlaylistSource.MEM_SPACE,
         ),
-        onLongPress: onLongPress,
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(

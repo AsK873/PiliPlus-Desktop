@@ -1,7 +1,7 @@
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/constants.dart';
-import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/animated_height.dart';
+import 'package:PiliPlus/common/widgets/desktop/desktop_tokens.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/common/widgets/expandable.dart';
 import 'package:PiliPlus/common/widgets/gesture/tap_gesture_recognizer.dart';
@@ -23,6 +23,7 @@ import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/controller.dart';
+import 'package:PiliPlus/pages/video/introduction/ugc/widgets/action_item.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/page.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/season.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
@@ -39,8 +40,10 @@ import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:material_ui/material_ui.dart';
@@ -79,6 +82,20 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
       UgcIntroController.new,
       tag: widget.heroTag,
     );
+    // 桌面端信息区自带「展开 / 收起」入口，进入时统一为折叠态：
+    // 「横屏自动展开视频简介」是面向移动/平板横屏（简介藏在一次点击之后）的设置，
+    // 桌面信息区常驻可见，这里不再套用；「默认展开视频简介」是用户的显式选择，
+    // 仍然生效。控制器的自动展开回调在 onInit 注册（先执行），本回调同帧复位。
+    if (PlatformUtils.isDesktop &&
+        !widget.isPortrait &&
+        Pref.expandIntroPanelH &&
+        !Pref.alwaysExpandIntroPanel) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && introController.expand.value) {
+          introController.expand.value = false;
+        }
+      });
+    }
   }
 
   @override
@@ -92,10 +109,11 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     final isPortrait = widget.isPortrait;
     final isHorizontal = !isPortrait && widget.isHorizontal;
     return SliverPadding(
-      padding: const .only(
-        left: Style.safeSpace,
-        right: Style.safeSpace,
-        top: 10,
+      padding: EdgeInsets.only(
+        left: DesktopTokens.gap12,
+        right: DesktopTokens.gap12,
+        // 桌面右栏信息区：顶部留白按 4px 栅格收紧（移动端保持原值）
+        top: PlatformUtils.isDesktop && !isPortrait ? DesktopTokens.gap8 : 10,
       ),
       sliver: Obx(
         () {
@@ -115,6 +133,7 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                     child: _buildOwnerInfo(
                       isLoading,
                       isPortrait,
+                      isHorizontal,
                       videoDetail,
                     ),
                   ),
@@ -134,7 +153,23 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                       const SizedBox(height: 2),
                       _buildArgueInfo(argueMsg),
                     ],
-                  if (isHorizontal && PlatformUtils.isDesktop)
+                  // 桌面端两种布局（播放器下方信息区 / 右侧信息栏）统一走
+                  // 「视频简介」标题行 + 可折叠正文：默认折叠，不进横向溢出
+                  if (PlatformUtils.isDesktop && !isPortrait) ...[
+                    const SizedBox(height: 8),
+                    _buildIntroHeader(colorScheme),
+                    Obx(
+                      () => AnimatedHeightWidgetExt(
+                        expand: introController.expand.value,
+                        duration: const Duration(milliseconds: 300),
+                        child: TranslucentColumn(
+                          mainAxisSize: .min,
+                          crossAxisAlignment: .start,
+                          children: _infos(videoDetail),
+                        ),
+                      ),
+                    ),
+                  ] else if (isHorizontal && PlatformUtils.isDesktop)
                     ..._infos(videoDetail)
                   else
                     Obx(
@@ -167,6 +202,16 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                             ),
                           ),
                   ),
+                  // 点赞收藏转发 布局样式2
+                  if (!isHorizontal) ...[
+                    const SizedBox(height: 8),
+                    actionGrid(
+                      context,
+                      isLoading,
+                      introController,
+                      videoDetail.stat,
+                    ),
+                  ],
                   // 合集
                   if (!isLoading &&
                       videoDetail.ugcSeason != null &&
@@ -218,14 +263,62 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
               child: Icon(
                 size: 13,
                 Icons.error_outline,
-                color: colorScheme.outline,
+                color: DesktopTokens.subtitleColor(colorScheme),
               ),
             ),
           ),
           TextSpan(text: argueMsg),
         ],
       ),
-      style: TextStyle(fontSize: 12, color: colorScheme.outline),
+      style: TextStyle(
+        fontSize: 12,
+        color: DesktopTokens.subtitleColor(colorScheme),
+      ),
+    );
+  }
+
+  /// 桌面端「视频简介」标题行：左标题 + 右「展开 / 收起」按钮
+  ///
+  /// 折叠状态复用 [UgcIntroController.expand]（设置项「默认展开视频简介」/
+  /// 「横屏自动展开视频简介」决定初值，默认折叠），因此与简介区点击展开、
+  /// 标题行数等既有行为保持同一份状态。
+  /// 标题用 [Expanded] 让位、按钮不设最小尺寸，窄栏（窗口化）下不会横向溢出。
+  Widget _buildIntroHeader(ColorScheme colorScheme) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            '视频简介',
+            maxLines: 1,
+            overflow: .ellipsis,
+            style: TextStyle(
+              fontSize: DesktopTokens.fontRowTitle,
+              fontWeight: .w600,
+              color: DesktopTokens.titleColor(colorScheme),
+            ),
+          ),
+        ),
+        const SizedBox(width: DesktopTokens.gap8),
+        Obx(() {
+          final expanded = introController.expand.value;
+          return TextButton.icon(
+            onPressed: introController.expand.toggle,
+            style: TextButton.styleFrom(
+              padding: const .symmetric(horizontal: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: .shrinkWrap,
+              visualDensity: const VisualDensity(vertical: -2.5),
+              foregroundColor: colorScheme.primary,
+              textStyle: const TextStyle(fontSize: DesktopTokens.fontSecondary),
+            ),
+            icon: Icon(
+              expanded ? Icons.expand_less : Icons.expand_more,
+              size: 18,
+            ),
+            label: Text(expanded ? '收起' : '展开'),
+          );
+        }),
+      ],
     );
   }
 
@@ -235,6 +328,9 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     VideoDetailData videoDetail,
   ) {
     if (isLoading) {
+      return _buildVideoTitle(videoDetail);
+    } else if (PlatformUtils.isDesktop && !isHorizontal) {
+      // 桌面右栏信息区：标题固定 2 行 + 省略号（不随简介展开变长）
       return _buildVideoTitle(videoDetail);
     } else if (isHorizontal && PlatformUtils.isDesktop) {
       return _buildVideoTitle(videoDetail, isSelectable: true);
@@ -253,10 +349,13 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     bool isExpand = false,
   }) {
     return GestureDetector(
-      onLongPress: () {
-        Feedback.forLongPress(context);
-        Utils.copyText(videoDetail.title ?? '');
-      },
+      // 桌面端长按 = 无动作（复制标题仍由既有右键/其它入口提供）；触屏长按保持不变。
+      onLongPress: PlatformUtils.isMobile
+          ? () {
+              Feedback.forLongPress(context);
+              Utils.copyText(videoDetail.title ?? '');
+            }
+          : null,
       child: _buildVideoTitle(videoDetail, isExpand: isExpand),
     );
   }
@@ -398,14 +497,20 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
       if (isSelectable) {
         return SelectionText.rich(
           textSpan,
-          style: const TextStyle(fontSize: 16),
+          style: TextStyle(
+            fontSize: DesktopTokens.fontSectionTitle,
+            color: DesktopTokens.titleColor(colorScheme),
+          ),
         );
       }
       return Text.rich(
         textSpan,
         maxLines: isExpand ? null : 2,
         overflow: isExpand ? null : .ellipsis,
-        style: const TextStyle(fontSize: 16),
+        style: TextStyle(
+          fontSize: DesktopTokens.fontSectionTitle,
+          color: DesktopTokens.titleColor(colorScheme),
+        ),
       );
     }
 
@@ -444,6 +549,100 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
           ),
         );
       },
+    );
+  }
+
+  Widget actionGrid(
+    BuildContext context,
+    bool isLoading,
+    UgcIntroController introController,
+    VideoStat? stat,
+  ) {
+    return SizedBox(
+      // 桌面操作栏统一行高（Desktop UI Kit 的列表行高 token）
+      height: DesktopTokens.rowHeight,
+      child: Row(
+        crossAxisAlignment: .start,
+        children: [
+          Obx(
+            () => ActionItem(
+              animation: introController.tripleAnimation,
+              desktopTokens: true,
+              icon: const Icon(FontAwesomeIcons.thumbsUp),
+              selectIcon: const Icon(FontAwesomeIcons.solidThumbsUp),
+              selectStatus: introController.hasLike.value,
+              semanticsLabel: '点赞',
+              text: !isLoading ? NumUtils.numFormat(stat!.like) : null,
+              onStartTriple: introController.onStartTriple,
+              onCancelTriple: introController.onCancelTriple,
+            ),
+          ),
+          Obx(
+            () => ActionItem(
+              desktopTokens: true,
+              icon: const Icon(FontAwesomeIcons.thumbsDown),
+              selectIcon: const Icon(FontAwesomeIcons.solidThumbsDown),
+              onTap: () => introController.handleAction(
+                introController.actionDislikeVideo,
+              ),
+              selectStatus: introController.hasDislike.value,
+              semanticsLabel: '点踩',
+              text: "点踩",
+            ),
+          ),
+          Obx(
+            () => ActionItem(
+              animation: introController.tripleAnimation,
+              desktopTokens: true,
+              icon: const Icon(FontAwesomeIcons.b),
+              selectIcon: const Icon(FontAwesomeIcons.b),
+              onTap: introController.actionCoinVideo,
+              selectStatus: introController.hasCoin,
+              semanticsLabel: '投币',
+              text: !isLoading ? NumUtils.numFormat(stat!.coin) : null,
+            ),
+          ),
+          Obx(
+            () => ActionItem(
+              animation: introController.tripleAnimation,
+              desktopTokens: true,
+              icon: const Icon(FontAwesomeIcons.star),
+              selectIcon: const Icon(FontAwesomeIcons.solidStar),
+              onTap: () => introController.showFavBottomSheet(context),
+              // 桌面端长按 = 无动作（收藏面板仍由点击打开）
+              onLongPress: PlatformUtils.isMobile
+                  ? () => introController.showFavBottomSheet(
+                      context,
+                      isLongPress: true,
+                    )
+                  : null,
+              selectStatus: introController.hasFav.value,
+              semanticsLabel: '收藏',
+              text: !isLoading ? NumUtils.numFormat(stat!.favorite) : null,
+            ),
+          ),
+          Obx(
+            () => ActionItem(
+              desktopTokens: true,
+              icon: const Icon(FontAwesomeIcons.clock),
+              selectIcon: const Icon(FontAwesomeIcons.solidClock),
+              onTap: () =>
+                  introController.handleAction(introController.viewLater),
+              selectStatus: introController.hasLater.value,
+              semanticsLabel: '再看',
+              text: '再看',
+            ),
+          ),
+          ActionItem(
+            desktopTokens: true,
+            icon: const Icon(FontAwesomeIcons.shareFromSquare),
+            onTap: () => introController.actionShareVideo(context),
+            selectStatus: false,
+            semanticsLabel: '分享',
+            text: !isLoading ? NumUtils.numFormat(stat!.share!) : null,
+          ),
+        ],
+      ),
     );
   }
 
@@ -605,6 +804,7 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
   Widget _buildOwnerInfo(
     bool isLoading,
     bool isPortrait,
+    bool isHorizontal,
     VideoDetailData videoDetail,
   ) {
     final mid = videoDetail.owner?.mid;
@@ -646,6 +846,17 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
           ),
           followButton(context),
         ],
+        if (isHorizontal) ...[
+          const SizedBox(width: 10),
+          Expanded(
+            child: actionGrid(
+              context,
+              isLoading,
+              introController,
+              videoDetail.stat,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -681,8 +892,8 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
               NetworkImgLayer(
                 type: .avatar,
                 src: item.face,
-                width: 35,
-                height: 35,
+                width: 32,
+                height: 32,
                 fadeInDuration: Duration.zero,
                 fadeOutDuration: Duration.zero,
               ),
@@ -758,12 +969,15 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                   fontSize: 13,
                   color: (item.vip?.status ?? 0) > 0 && item.vip?.type == 2
                       ? colorScheme.vipColor
-                      : null,
+                      : DesktopTokens.subtitleColor(colorScheme),
                 ),
               ),
               Text(
                 item.title!,
-                style: TextStyle(fontSize: 12, color: colorScheme.outline),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: DesktopTokens.subtitleColor(colorScheme),
+                ),
               ),
             ],
           ),
@@ -788,13 +1002,13 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
         final userStat = introController.userStat.value;
         final isVip = (userStat.card?.vip?.status ?? 0) > 0;
         return Row(
-          spacing: 10,
+          spacing: 8,
           mainAxisSize: .min,
           children: [
             PendantAvatar(
               userStat.card?.face,
-              size: 35,
-              badgeSize: 14,
+              size: 32,
+              badgeSize: 13,
               vipStatus: userStat.card?.vip?.status,
               officialType: userStat.card?.official?.type,
             ),
@@ -806,15 +1020,25 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                   maxLines: 1,
                   overflow: .ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: DesktopTokens.fontSecondary,
+                    // 桌面右栏视觉层级：UP 主名称（主文字色 + w500）强于
+                    // 统计 / 简介正文（次级文字色），弱于视频标题
+                    fontWeight: PlatformUtils.isDesktop && !widget.isPortrait
+                        ? .w500
+                        : null,
                     color: isVip && userStat.card?.vip?.type == 2
                         ? colorScheme.vipColor
-                        : null,
+                        : PlatformUtils.isDesktop && !widget.isPortrait
+                        ? DesktopTokens.titleColor(colorScheme)
+                        : DesktopTokens.subtitleColor(colorScheme),
                   ),
                 ),
                 Text(
                   '${NumUtils.numFormat(userStat.follower)}粉丝    ${'${NumUtils.numFormat(userStat.archiveCount)}视频'}',
-                  style: TextStyle(fontSize: 12, color: colorScheme.outline),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: DesktopTokens.subtitleColor(colorScheme),
+                  ),
                 ),
               ],
             ),
@@ -825,38 +1049,39 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
   );
 
   Widget _buildInfo(VideoStat? stat, int? pubdate) {
+    final subtitleColor = DesktopTokens.subtitleColor(colorScheme);
     return Row(
       spacing: 10,
       children: [
         StatWidget(
           type: .play,
           value: stat?.view,
-          color: colorScheme.outline,
+          color: subtitleColor,
         ),
         StatWidget(
           type: .danmaku,
           value: stat?.danmaku,
-          color: colorScheme.outline,
+          color: subtitleColor,
         ),
         Text(
           DateFormatUtils.format(pubdate),
           style: TextStyle(
             fontSize: 12,
-            color: colorScheme.outline,
+            color: subtitleColor,
           ),
         ),
         if (MineController.anonymity.value)
           Icon(
             MdiIcons.incognito,
             size: 15,
-            color: colorScheme.outline,
+            color: subtitleColor,
             semanticLabel: '无痕',
           ),
         if (introController.isShowOnlineTotal)
           Obx(
             () => Text(
               '${introController.total.value}人在看',
-              style: TextStyle(fontSize: 12, color: colorScheme.outline),
+              style: TextStyle(fontSize: 12, color: subtitleColor),
             ),
           ),
       ],
@@ -923,7 +1148,7 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                     parameters: {'keyword': tagName},
                   ),
                 },
-                onLongPress: Utils.copyText,
+                onLongPress: PlatformUtils.isMobile ? Utils.copyText : null,
               ),
             )
             .toList(),

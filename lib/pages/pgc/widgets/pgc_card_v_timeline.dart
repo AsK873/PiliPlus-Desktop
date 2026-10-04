@@ -27,7 +27,7 @@ class PgcCardVTimeline extends StatelessWidget {
       shape: const RoundedRectangleBorder(borderRadius: Style.mdRadius),
       child: InkWell(
         borderRadius: Style.mdRadius,
-        onLongPress: onLongPress,
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         onTap: () =>
             PageUtils.viewPgc(seasonId: item.seasonId, epId: item.episodeId),

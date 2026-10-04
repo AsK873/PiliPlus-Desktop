@@ -44,7 +44,7 @@ class VideoCardHLater extends StatelessWidget {
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
-        onLongPress: onLongPress,
+        onLongPress: PlatformUtils.isMobile ? onLongPress : null,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         onTap: enableMultiSelect
             ? () => ctr.onSelect(videoItem)
