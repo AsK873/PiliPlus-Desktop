@@ -185,6 +185,19 @@ Win32Window::MessageHandler(HWND hwnd,
       }
     break;
 
+    // [EXP-C5] 仅替换"标题栏双击"这一条最大化入口：改用 placement 路径；
+    // 最大化按钮 / 系统菜单 / Win+↑ / Snap / SC_MAXIMIZE 一律仍走系统默认处理。
+    case WM_NCLBUTTONDBLCLK:
+      if (wparam == HTCAPTION && !IsZoomed(hwnd)) {
+        WINDOWPLACEMENT wp{sizeof(WINDOWPLACEMENT)};
+        if (GetWindowPlacement(hwnd, &wp)) {
+          wp.showCmd = SW_SHOWMAXIMIZED;
+          SetWindowPlacement(hwnd, &wp);
+          return 0;
+        }
+      }
+      break;
+
     case WM_DESTROY:
       window_handle_ = nullptr;
       Destroy();
