@@ -10,7 +10,7 @@
     <p>使用Flutter开发的BiliBili第三方windows客户端</p>
     
 <img width="1086" height="706" alt="屏幕截图 2026-10-04 083954" src="https://github.com/user-attachments/assets/5146761b-c41a-4550-a385-0f963deb6a6d" />
-![Uploading 屏幕截图 2026-10-04 084317.png…]()
+<img width="1086" height="689" alt="屏幕截图 2026-10-04 084317" src="https://github.com/user-attachments/assets/00eb8d83-46c9-45e3-85a9-fff42bbea521" />
 
 
 <img width="2560" height="1392" alt="屏幕截图 2026-10-04 084122" src="https://github.com/user-attachments/assets/71013dc9-7d14-471d-bc96-0e42550f7686" />
