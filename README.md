@@ -1,14 +1,3 @@
-<div align="center">
-    <img width="200" height="200" src="assets/images/logo/logo.png">
-</div>
-
-
-
-<div align="center">
-    <h1>PiliPlus</h1>
-<div align="center">
-    <p>使用Flutter开发的BiliBili第三方windows客户端</p>
-    <p align="center">
 <p align="center">
   <img src="https://github.com/user-attachments/assets/acb91f16-2d87-4a36-9b8e-085cf094474c" width="49%" />
   <img src="https://github.com/user-attachments/assets/3d2a7494-9d44-40e2-957e-01ba99d7e888" width="49%" />
