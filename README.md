@@ -1,11 +1,4 @@
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/acb91f16-2d87-4a36-9b8e-085cf094474c" width="49%" />
-  <img src="https://github.com/user-attachments/assets/3d2a7494-9d44-40e2-957e-01ba99d7e888" width="49%" />
-</p>
-    </p>
- <img width="2560" height="1392" alt="屏幕截图 2026-10-06 091009" src="https://github.com/user-attachments/assets/863cf357-cc8b-46cd-acfe-d38d8a7e1eca" />
-
-
+<img width="200" height="200" src="assets/images/logo/logo.png">
 
 </div>
 
@@ -34,6 +27,7 @@
 </div>
 
 <br/>
+
 
 ## 主要改动
 
