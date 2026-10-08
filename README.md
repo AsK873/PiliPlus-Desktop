@@ -11,8 +11,6 @@
 
 <div align="center">
 
-<h1>PiliPlus</h1>
-
 <p align="center">
 
 <p align="center">
