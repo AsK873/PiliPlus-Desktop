@@ -8,7 +8,7 @@
 
 <div align="center">
 
-<p>使用Flutter开发的BiliBili第三方Windows客户端</p>
+<p>使用Flutter开发的BiliBili第三方windows客户端</p>
 
 <p align="center">
 
@@ -27,7 +27,6 @@
 </div>
 
 <br/>
-
 主要改动
 
 ## 主要改动
