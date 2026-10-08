@@ -44,7 +44,7 @@
 
 <br/>
 
-###适配平台
+  适配平台
 
 Windows
 
@@ -53,13 +53,13 @@ Windows
 
 <br/>
 
-###下载
+  下载
 
 可以通过右侧 Release 进行下载或拉取代码到本地进行编译。
 
 <br/>
 
-###声明
+  声明
 
 此项目（PiliPlus）是个人为了兴趣而开发，仅用于学习和测试，请于下载后24小时内删除。
 
@@ -75,7 +75,7 @@ Windows
 
 <br/>
 
-###致谢
+致谢
 bilibili-API-collect
 flutter_meedu_videoplayer
 media-kit
