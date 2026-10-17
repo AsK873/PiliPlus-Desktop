@@ -61,8 +61,12 @@ class _MusicRecommendPageState extends State<MusicRecommendPage>
         response != null && response.isNotEmpty
             ? SliverGrid.builder(
                 gridDelegate: gridDelegate,
-                itemBuilder: (context, index) =>
+                itemBuilder: (context, index) {
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
                     MusicVideoCardH(videoItem: response[index]),
+                  );
+                },
                 itemCount: response.length,
               )
             : HttpError(onReload: _controller.onReload),

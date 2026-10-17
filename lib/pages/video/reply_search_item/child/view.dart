@@ -60,9 +60,12 @@ class _ReplySearchChildPageState extends State<ReplySearchChildPage>
                   if (index == response.length - 1) {
                     _controller.onLoadMore();
                   }
-                  return ReplySearchItem(
-                    item: response[index],
-                    type: widget.searchType,
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    ReplySearchItem(
+                      item: response[index],
+                      type: widget.searchType,
+                    ),
                   );
                 },
                 itemCount: response.length,

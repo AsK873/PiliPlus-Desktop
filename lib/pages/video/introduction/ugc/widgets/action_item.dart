@@ -68,9 +68,14 @@ class _ActionItemState extends State<ActionItem> {
     late final primary = !widget.expand && colorScheme.isLight
         ? colorScheme.inversePrimary
         : colorScheme.primary;
+    // 操作栏（三连）**不使用** DesktopTokens.sidePanelScale(1.2) 放大：
+    // 图标尺寸与文字字号保持项目默认值（18 / 28 / labelSmall），
+    // 与移动端、播放器全屏浮层一致；`desktopTokens` 仅保留桌面配色与 Hover 反馈。
+    const actionIconSize = 18.0;
+    const actionIconBox = 28.0;
     Widget child = Icon(
       widget.selectStatus ? widget.selectIcon!.icon! : widget.icon.icon,
-      size: 18,
+      size: actionIconSize,
       color: widget.selectStatus
           ? primary
           : widget.icon.color ?? _idleColor(colorScheme),
@@ -85,7 +90,7 @@ class _ActionItemState extends State<ActionItem> {
           AnimatedBuilder(
             animation: widget.animation!,
             builder: (context, child) => Arc(
-              size: 28,
+              size: actionIconBox,
               color: primary,
               progress: -widget.animation!.value,
             ),
@@ -94,7 +99,10 @@ class _ActionItemState extends State<ActionItem> {
         ],
       );
     } else {
-      child = SizedBox.square(dimension: 28, child: child);
+      child = SizedBox.square(
+        dimension: actionIconBox,
+        child: child,
+      );
     }
 
     child = Material(
@@ -139,6 +147,7 @@ class _ActionItemState extends State<ActionItem> {
         color: widget.selectStatus
             ? theme.colorScheme.primary
             : _idleColor(theme.colorScheme),
+        // 操作栏文字：保持项目默认字号（不随 sidePanelScale 放大）
         fontSize: theme.textTheme.labelSmall!.fontSize,
       ),
     );

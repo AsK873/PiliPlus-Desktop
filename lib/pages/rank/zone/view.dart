@@ -47,9 +47,10 @@ class _ZonePageState extends State<ZonePage>
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.only(top: 7, bottom: 100),
-            // 桌面端内容限宽居中（默认 1480 = Style.contentMaxWidth，超宽屏下不再横向铺满）
+            // 与首页网格一致：卡片网格不限宽、列数按可用宽度动态决定
             sliver: desktopLimitSliver(
               Obx(() => _buildBody(controller.loadingState.value)),
+              maxWidth: double.infinity,
             ),
           ),
         ],
@@ -67,17 +68,23 @@ class _ZonePageState extends State<ZonePage>
                 itemBuilder: (context, index) {
                   final item = response[index];
                   if (item is HotVideoItemModel) {
-                    return desktopCard(
-                      VideoCardH(
-                        videoItem: item,
-                        onRemove: () => controller.loadingState
-                          ..value.data!.removeAt(index)
-                          ..refresh(),
+                    // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                    return gridDelegate.scaled(
+                      desktopCard(
+                        VideoCardH(
+                          videoItem: item,
+                          onRemove: () => controller.loadingState
+                            ..value.data!.removeAt(index)
+                            ..refresh(),
+                        ),
+                        prefetchBvid: item.bvid,
                       ),
-                      prefetchBvid: item.bvid,
                     );
                   }
-                  return desktopCard(PgcRankItem(item: item));
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    desktopCard(PgcRankItem(item: item)),
+                  );
                 },
                 itemCount: response.length,
               )

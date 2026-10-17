@@ -985,6 +985,10 @@ abstract final class Pref {
   static bool get showWindowTitleBar =>
       _setting.get(SettingBoxKey.showWindowTitleBar, defaultValue: true);
 
+  /// PiP 是否锁定视频宽高比（默认开启：与既有等比缩放行为一致）。
+  static bool get pipLockAspectRatio =>
+      _setting.get(SettingBoxKey.pipLockAspectRatio, defaultValue: true);
+
   static double get desktopVolume =>
       _setting.get(SettingBoxKey.desktopVolume, defaultValue: 1.0);
 

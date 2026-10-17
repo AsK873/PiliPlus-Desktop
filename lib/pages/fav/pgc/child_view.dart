@@ -55,11 +55,12 @@ class _FavPgcChildPageState extends State<FavPgcChildPage>
           slivers: [
             SliverPadding(
               padding: EdgeInsets.only(bottom: padding.bottom + 100),
-              // 桌面端内容限宽居中（默认 1480 = Style.contentMaxWidth）
+              // 与首页网格一致：卡片网格不限宽、列数按可用宽度动态决定
               sliver: desktopLimitSliver(
                 Obx(
                   () => _buildBody(_favPgcController.loadingState.value),
                 ),
+                maxWidth: double.infinity,
               ),
             ),
           ],
@@ -182,28 +183,31 @@ class _FavPgcChildPageState extends State<FavPgcChildPage>
                     _favPgcController.onLoadMore();
                   }
                   final item = response[index];
-                  return FavPgcItem(
-                    item: item,
-                    ctr: _favPgcController,
-                    onSelect: () => _favPgcController.onSelect(item),
-                    onUpdateStatus: () => showPgcFollowDialog(
-                      context: context,
-                      type: widget.type == 0 ? '追番' : '追剧',
-                      followStatus: widget.followStatus,
-                      onUpdateStatus: (followStatus) {
-                        if (followStatus == -1) {
-                          _favPgcController.pgcDel(
-                            index,
-                            item.seasonId,
-                          );
-                        } else {
-                          _favPgcController.onUpdate(
-                            index,
-                            followStatus,
-                            item.seasonId,
-                          );
-                        }
-                      },
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    FavPgcItem(
+                      item: item,
+                      ctr: _favPgcController,
+                      onSelect: () => _favPgcController.onSelect(item),
+                      onUpdateStatus: () => showPgcFollowDialog(
+                        context: context,
+                        type: widget.type == 0 ? '追番' : '追剧',
+                        followStatus: widget.followStatus,
+                        onUpdateStatus: (followStatus) {
+                          if (followStatus == -1) {
+                            _favPgcController.pgcDel(
+                              index,
+                              item.seasonId,
+                            );
+                          } else {
+                            _favPgcController.onUpdate(
+                              index,
+                              followStatus,
+                              item.seasonId,
+                            );
+                          }
+                        },
+                      ),
                     ),
                   );
                 },

@@ -9,6 +9,7 @@ import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/video.dart';
+import 'package:PiliPlus/main.dart' show windowMinimumSize;
 import 'package:PiliPlus/models/common/account_type.dart';
 import 'package:PiliPlus/models/common/audio_normalization.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
@@ -28,6 +29,7 @@ import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/plugin/pl_player/models/video_fit_type.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/fullscreen.dart';
+import 'package:PiliPlus/plugin/pl_player/widgets/abortable_long_press_recognizer.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/android/android_helper.dart';
@@ -61,12 +63,14 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:native_device_orientation/native_device_orientation.dart';
 import 'package:path/path.dart' as path;
 import 'package:screen_brightness_platform_interface/screen_brightness_platform_interface.dart';
+import 'package:screen_retriever/screen_retriever.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 typedef PlayCallback = Future<void>? Function();
 
-class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
+class PlPlayerController
+    with BlockConfigMixin, AudioNormalizationMixin, WindowListener {
   Player? _videoPlayerController;
   VideoController? _videoController;
 
@@ -208,12 +212,153 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     return windowManager.setAlwaysOnTop(value);
   }
 
+  /// 进入 PiP 时记录的视频宽高比（供比例锁恢复约束使用）。
+  double _pipAspectRatio = 16 / 9;
+
+  /// PiP 是否锁定视频宽高比：默认开启（保持既有等比缩放行为）。
+  ///
+  /// 关闭后调用 `windowManager.setAspectRatio(0)` 解除比例约束；重新开启后
+  /// 恢复当前视频的宽高比约束。注意原生只在用户**下一次拖拽**
+  /// （`WM_SIZING`）时应用比例，不会立即改变当前窗口尺寸。
+  late final RxBool pipLockAspectRatio = Pref.pipLockAspectRatio.obs;
+
+  Future<void> setPipLockAspectRatio(bool value) {
+    pipLockAspectRatio.value = value;
+    // 沿用既有约定：临时播放器配置开启时不落盘。
+    if (!tempPlayerConf) {
+      setting.put(SettingBoxKey.pipLockAspectRatio, value);
+    }
+    return windowManager.setAspectRatio(value ? _pipAspectRatio : 0);
+  }
+
+  // ---- PiP：控制栏守卫（按下 / 菜单展开期间不自动隐藏）----
+  //
+  // 作用域限定 PiP：两个标记只会在 PiP 下被置位，因此主窗口行为不变。
+  bool _pipPointerDown = false;
+  bool _pipMenuShowing = false;
+
+  /// PiP 下指针按下或弹出菜单展开：期间不自动隐藏控制栏。
+  bool get controlsPinned => _pipPointerDown || _pipMenuShowing;
+
+  /// 取消空闲隐藏并保持控制栏可见（PiP 顶栏拖动/按下/菜单展开时用）。
+  void cancelAutoHide() {
+    _timer?.cancel();
+    _timer = null;
+    showControls.value = true;
+  }
+
+  /// PiP：指针按下状态（由播放器指针回调维护）。
+  void setPipPointerDown(bool val) {
+    if (!isDesktopPip) return;
+    _pipPointerDown = val;
+    if (val) {
+      cancelAutoHide();
+    } else {
+      hideTaskControls();
+    }
+  }
+
+  /// PiP：弹出菜单展开状态（由各 PopupMenuButton 的 onOpened/onCanceled/
+  /// onSelected 维护）。
+  void setPipMenuShowing(bool val) {
+    if (!isDesktopPip) return;
+    if (_pipMenuShowing == val) return;
+    _pipMenuShowing = val;
+    if (val) {
+      cancelAutoHide();
+    } else if (showControls.value) {
+      hideTaskControls();
+    }
+  }
+
+  // ---- PiP：窗口边界保护（多显示器可见工作区）----
+
+  bool _pipClamping = false;
+
+  @override
+  void onWindowMoved() {
+    if (PlatformUtils.isDesktop && isDesktopPip) _afterPipWindowChange();
+  }
+
+  @override
+  void onWindowResized() {
+    if (PlatformUtils.isDesktop && isDesktopPip) _afterPipWindowChange();
+  }
+
+  /// 一次移动/缩放**结束后**（WM_EXITSIZEMOVE）：夹回可见工作区，并恢复空闲计时。
+  Future<void> _afterPipWindowChange() async {
+    if (_pipClamping) return;
+    _pipClamping = true;
+    try {
+      await _clampPipToVisibleArea();
+      // 拖动/缩放期间计时被 cancelAutoHide 取消，这里恢复（仍可见时才续期）
+      if (showControls.value && !controlsPinned) {
+        hideTaskControls();
+      }
+    } finally {
+      _pipClamping = false;
+    }
+  }
+
+  /// 把 PiP 窗口夹回「与之重叠面积最大的显示器」的可见工作区。
+  ///
+  /// 单位换算：`window_manager` 的 bounds 为**逻辑**像素，`screen_retriever`
+  /// 的显示器坐标为**物理**像素，用当前视图的 devicePixelRatio 换算（与原生
+  /// 插件 `pixel_ratio_` 同源，均来自 WM_DPICHANGED）。
+  /// 跨不同 DPI 显示器时以窗口当前所在显示器的比例为近似。
+  Future<void> _clampPipToVisibleArea() async {
+    if (!PlatformUtils.isDesktop || !isDesktopPip) return;
+    final displays = await screenRetriever.getAllDisplays();
+    if (displays.isEmpty) return;
+    final bounds = await windowManager.getBounds();
+    final dpr = ui.PlatformDispatcher.instance.views.isEmpty
+        ? 1.0
+        : ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
+    final win = Rect.fromLTWH(
+      bounds.left * dpr,
+      bounds.top * dpr,
+      bounds.width * dpr,
+      bounds.height * dpr,
+    );
+
+    Display? target;
+    double best = -1;
+    for (final d in displays) {
+      final p = d.visiblePosition ?? Offset.zero;
+      final s = d.visibleSize ?? d.size;
+      final r = Rect.fromLTWH(p.dx, p.dy, s.width, s.height);
+      final i = r.intersect(win);
+      final overlap = i.isEmpty ? 0.0 : i.width * i.height;
+      if (overlap > best) {
+        best = overlap;
+        target = d;
+      }
+    }
+    if (target == null) return;
+
+    final p = target.visiblePosition ?? Offset.zero;
+    final s = target.visibleSize ?? target.size;
+    final left = win.width <= s.width
+        ? win.left.clamp(p.dx, p.dx + s.width - win.width)
+        : p.dx;
+    final top = win.height <= s.height
+        ? win.top.clamp(p.dy, p.dy + s.height - win.height)
+        : p.dy;
+    if ((left - win.left).abs() < 1 && (top - win.top).abs() < 1) return;
+    await windowManager.setBounds(
+      Rect.fromLTWH(left / dpr, top / dpr, bounds.width, bounds.height),
+    );
+  }
+
   Future<void> exitDesktopPip() {
     isDesktopPip = false;
     return Future.wait([
       if (showWindowTitleBar)
         windowManager.setTitleBarStyle(TitleBarStyle.normal),
-      windowManager.setMinimumSize(const Size(400, 700)),
+      // 与启动时一致（kWindowMinimumSize = 960x640）：此前写死 400x700 会使
+      // 退出 PiP 后主窗可被压到设计下限以下，并让 pages/main/view.dart 的
+      // 「被最小尺寸夹住则不写回」判定（按 960x640）失效。
+      windowManager.setMinimumSize(windowMinimumSize()),
       windowManager.setBounds(_lastWindowBounds),
       setAlwaysOnTop(false),
       windowManager.setAspectRatio(0),
@@ -232,9 +377,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
 
     const shortSide = 280.0;
-    const minShortSide = 160.0;
     final Size size;
-    final Size minimumSize;
     final state = videoPlayerController!.state;
     int width = state.width;
     int height = state.height;
@@ -246,17 +389,23 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
     if (height > width) {
       size = Size(shortSide, shortSide * height / width);
-      minimumSize = Size(minShortSide, minShortSide * height / width);
     } else {
       size = Size(shortSide * width / height, shortSide);
-      minimumSize = Size(minShortSide * width / height, minShortSide);
     }
 
-    await windowManager.setMinimumSize(minimumSize);
+    _pipAspectRatio = width / height;
+
+    // 最小尺寸＝入场尺寸：不再使用固定 160 短边下限，
+    // 进入 PiP 后只可放大、不可缩小（退出 PiP 仍恢复主窗最小尺寸）。
+    await windowManager.setMinimumSize(size);
     setAlwaysOnTop(true);
     windowManager
       ..setSize(size)
-      ..setAspectRatio(width / height);
+      // 比例锁默认开启（保持既有等比缩放）；关闭时下发 0 解除比例约束。
+      ..setAspectRatio(pipLockAspectRatio.value ? _pipAspectRatio : 0);
+
+    // 入场即校正到可见工作区（主窗口靠边/多显示器场景）
+    await _clampPipToVisibleArea();
   }
 
   void toggleDesktopPip() {
@@ -556,6 +705,11 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       } else {
         _isAutoEnterPip = true;
       }
+    }
+
+    // PiP 窗口边界保护需要窗口移动/缩放结束事件（WM_EXITSIZEMOVE）。
+    if (PlatformUtils.isDesktop) {
+      windowManager.addListener(this);
     }
   }
 
@@ -1089,13 +1243,137 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
   }
 
-  /// 设置倍速
-  Future<void> setPlaybackSpeed(double speed) async {
-    lastPlaybackSpeed = playbackSpeed;
+  /// 长按倍速前的「正常速度」。
+  ///
+  /// 只在进入长按（[setLongPressStatus]）与长按期间手动改速（[setPlaybackSpeed]）
+  /// 时写入，长按收尾读它恢复并置空。与 [lastPlaybackSpeed]（仅供弹幕时长换算
+  /// 记录「上一个速度」）分开存放，避免收尾时读到「长按倍速」本身而把速度锁死；
+  /// 因此收尾是**幂等**的：重复收尾也只会回到正常速度。
+  double? _speedBeforeLongPress;
 
+  // ---- 窗口输入稳定期 ----
+  //
+  // 实测（speed-diagnostic2 取证）：Windows 最大化/还原后约 39ms / 57ms，引擎会向
+  // 播放器投递 kind=mouse、buttons=1、synthesized=false 的 PointerDown，而该次 down
+  // 的 up 会被窗口状态切换吞掉（日志中该 pointer 永无 PU/PC）。这种 down 一旦 arm
+  // 长按，500ms 后 deadline 会照常触发（Flutter 侧 `didExceedDeadline` 无状态守卫），
+  // 于是把播放速度改成长按倍速（3×）——即「没有真实长按却 3×」的真实根因。
+  //
+  // 因此把「窗口状态/尺寸变化的时刻」作为**单一来源**，在其后的短暂输入不稳定窗口内，
+  // 新进入播放器的 PointerDown 不再作为长按手势（点击/双击/缩放等其它手势不受影响，
+  // 正常鼠标长按也不受影响，只是需要晚于窗口变化 100ms 再按下）。
+
+  /// 单调时钟：窗口状态变化的计时基准。
+  static final Stopwatch _windowClock = Stopwatch()..start();
+
+  /// 窗口状态变化后的输入稳定期。
+  static const Duration windowInputSettleDuration = Duration(milliseconds: 100);
+
+  /// 最近一次窗口状态/尺寸变化的单调时刻。
+  Duration? _lastWindowChangeAt;
+
+  /// 记录一次窗口状态/尺寸变化。
+  ///
+  /// 调用点：`onWindowMaximize` / `onWindowUnmaximize` / `onWindowResized`
+  /// 以及播放器视口尺寸变化（`didChangeDependencies`）。
+  void markWindowChanged() {
+    _lastWindowChangeAt = _windowClock.elapsed;
+  }
+
+  /// 当前 PointerDown 是否落在窗口输入稳定期内（为 true 时不得 arm 长按）。
+  bool isWithinWindowInputSettle() {
+    final last = _lastWindowChangeAt;
+    if (last == null) {
+      return false;
+    }
+    return _windowClock.elapsed - last < windowInputSettleDuration;
+  }
+
+  // ---- 长按倍速的手势生命周期 ----
+  //
+  // 拒绝「失效长按」的正确做法是**取消 recognizer 自己的 deadline 定时器**，
+  // 而不是在业务层拦结果：`LongPressGestureRecognizer` 的 deadline 只在
+  // up/cancel（`didStopTrackingLastPointer`）、`rejectGesture`、`acceptGesture`
+  // 或 `dispose` 时被取消，窗口 resize 不在其中（实测：resize 之后
+  // `didExceedDeadline()` 仍会执行并进入长按倍速）。
+  // 因此这里登记「当前持有 deadline 的 recognizer」，在窗口尺寸变化等手势边界
+  // 上调用 [AbortableLongPressRecognizer.abort] 真正终止这次 pointer tracking。
+  // 即使播放器 State 在窗口变化中被重建（旧 recognizer 尚未 dispose），
+  // 这里登记的仍是**实际持有定时器的那一个**。
+
+  /// 当前登记的长按识别器（播放器 arm 长按时登记）。
+  AbortableLongPressRecognizer? _activeSpeedRecognizer;
+
+  /// 登记当前长按识别器（播放器 arm 长按时调用）。
+  void registerSpeedRecognizer(AbortableLongPressRecognizer recognizer) {
+    _activeSpeedRecognizer = recognizer;
+  }
+
+  /// 注销长按识别器（播放器 dispose 时调用）。
+  void unregisterSpeedRecognizer(AbortableLongPressRecognizer recognizer) {
+    if (identical(_activeSpeedRecognizer, recognizer)) {
+      _activeSpeedRecognizer = null;
+    }
+  }
+
+  /// 中止当前登记的长按跟踪（幂等；无登记/无 active pointer 时无副作用）。
+  void abortSpeedRecognizer() {
+    final recognizer = _activeSpeedRecognizer;
+    if (recognizer == null) {
+      return;
+    }
+    recognizer.abort();
+    if (!recognizer.hasActivePointer) {
+      _activeSpeedRecognizer = null;
+    }
+  }
+
+  /// 播放器 Listener：指针抬起/取消 → 幂等收尾
+  /// （识别器自身也会收到 up 并触发 `onLongPressEnd`，这里只是兜底）。
+  Future<void> notifySpeedPointerUpOrCancel() async {
+    if (longPressStatus.value) {
+      await setLongPressStatus(false);
+    }
+  }
+
+  /// 指针离开播放器区域 → 中止本次长按并幂等收尾
+  Future<void> notifySpeedPointerExited() async {
+    abortSpeedRecognizer();
+    if (longPressStatus.value) {
+      await setLongPressStatus(false);
+    }
+  }
+
+  /// 视口尺寸变化（窗口最大化 / 还原 / 缩放）→ 中止本次长按并幂等收尾。
+  ///
+  /// 这是拒绝失效长按的主路径：resize 本身就是取消手势的边界，
+  /// 不要求 pointer-up 必须补发给 recognizer。
+  Future<void> notifySpeedViewSizeChanged() async {
+    abortSpeedRecognizer();
+    if (longPressStatus.value) {
+      await setLongPressStatus(false);
+    }
+  }
+
+  /// 设置倍速（倍速菜单 / 快捷键 / 初始化恢复等外部入口）
+  Future<void> setPlaybackSpeed(double speed) async {
+    // 长按进行中手动改速：这是用户新的正常速度，长按收尾应恢复到它
+    if (longPressStatus.value) {
+      _speedBeforeLongPress = speed;
+    }
+    await _applyPlaybackSpeed(speed);
+  }
+
+  /// 真正写引擎倍速：外部入口 [setPlaybackSpeed] 与长按倍速都经这里。
+  ///
+  /// 速度无变化时**不写任何状态**：既不改 [lastPlaybackSpeed]（弹幕时长换算的
+  /// 「上一个速度」），也不重算弹幕时长——否则一次空调用就会把「上一个速度」
+  /// 污染成长按倍速，后续收尾再读它时就会把播放速度重新拉到长按倍速。
+  Future<void> _applyPlaybackSpeed(double speed) async {
     if (speed == _videoPlayerController?.state.rate) {
       return;
     }
+    lastPlaybackSpeed = playbackSpeed;
 
     await _videoPlayerController?.setRate(speed);
     _playbackSpeed.value = speed;
@@ -1125,8 +1403,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   /// 播放视频
   Future<void> play({bool repeat = false, bool hideControls = true}) async {
     if (_playerCount == 0) return;
-    // 播放时自动隐藏控制条
-    controls = !hideControls;
+    // 播放时自动隐藏控制条（PiP 下不立即隐藏：交由空闲计时与交互守卫处理）
+    if (!isDesktopPip) controls = !hideControls;
     // repeat为true，将从头播放
     if (repeat) {
       await seekTo(Duration.zero, isSeek: false);
@@ -1156,7 +1434,10 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   void hideTaskControls() {
     _timer?.cancel();
     _timer = Timer(showControlDuration, () {
-      if (!isSeeking.value && !tripling && !_volumePanelShowing) {
+      if (!isSeeking.value &&
+          !tripling &&
+          !_volumePanelShowing &&
+          !controlsPinned) {
         controls = false;
       }
       _timer = null;
@@ -1273,7 +1554,10 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     if (isLive) {
       return;
     }
-    if (controlsLock.value) {
+    // 只拦「进入长按」；收尾（val == false）永远执行：松手事件一旦在窗口状态
+    // 变化（最大化/还原）、指针离开播放器等情况下丢失，速度就会永久停在长按
+    // 倍速上，必须保证任何一次收尾调用都能把速度恢复正常。
+    if (val && controlsLock.value) {
       return;
     }
     if (longPressStatus.value == val) {
@@ -1282,15 +1566,21 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     if (val) {
       if (playerStatus.isPlaying) {
         longPressStatus.value = val;
+        // 记录正常速度（只在进入时记录一次）；长按倍速由它推算，
+        // 这样即使「进入」被重复执行也不会累乘（1.5×→3×→6×）
+        final normalSpeed = playbackSpeed;
+        _speedBeforeLongPress = normalSpeed;
         HapticFeedback.lightImpact();
-        await setPlaybackSpeed(
-          enableAutoLongPressSpeed ? playbackSpeed * 2 : longPressSpeed,
+        await _applyPlaybackSpeed(
+          enableAutoLongPressSpeed ? normalSpeed * 2 : longPressSpeed,
         );
       }
     } else {
-      // if (kDebugMode) debugPrint('$playbackSpeed');
       longPressStatus.value = val;
-      await setPlaybackSpeed(lastPlaybackSpeed);
+      final speed = _speedBeforeLongPress;
+      _speedBeforeLongPress = null;
+      // 幂等收尾：永远恢复到「长按前的正常速度」
+      await _applyPlaybackSpeed(speed ?? lastPlaybackSpeed);
     }
   }
 
@@ -1583,6 +1873,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       AndroidHelper$ToDart.onUserLeaveHint = null;
     }
     _timer?.cancel();
+    if (PlatformUtils.isDesktop) {
+      windowManager.removeListener(this);
+    }
     // _position.close();
     // _playerEventSubs?.cancel();
     // _sliderPosition.close();

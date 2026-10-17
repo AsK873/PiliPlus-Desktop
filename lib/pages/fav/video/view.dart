@@ -47,11 +47,12 @@ class _FavVideoPageState extends State<FavVideoPage>
               top: 7,
               bottom: 100 + MediaQuery.viewPaddingOf(context).bottom,
             ),
-            // 桌面端内容限宽居中（默认 1480 = Style.contentMaxWidth）
+            // 与首页网格一致：卡片网格不限宽、列数按可用宽度动态决定
             sliver: desktopLimitSliver(
               Obx(
                 () => _buildBody(_favController.loadingState.value),
               ),
+              maxWidth: double.infinity,
             ),
           ),
         ],
@@ -72,24 +73,27 @@ class _FavVideoPageState extends State<FavVideoPage>
                   }
                   final item = response[index];
                   String heroTag = Utils.makeHeroTag(item.fid);
-                  return FavVideoItem(
-                    heroTag: heroTag,
-                    item: item,
-                    onTap: () async {
-                      final res = await Get.toNamed(
-                        '/favDetail',
-                        arguments: item,
-                        parameters: {
-                          'heroTag': heroTag,
-                          'mediaId': item.id.toString(),
-                        },
-                      );
-                      if (res == true) {
-                        _favController.loadingState
-                          ..value.data!.removeAt(index)
-                          ..refresh();
-                      }
-                    },
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    FavVideoItem(
+                      heroTag: heroTag,
+                      item: item,
+                      onTap: () async {
+                        final res = await Get.toNamed(
+                          '/favDetail',
+                          arguments: item,
+                          parameters: {
+                            'heroTag': heroTag,
+                            'mediaId': item.id.toString(),
+                          },
+                        );
+                        if (res == true) {
+                          _favController.loadingState
+                            ..value.data!.removeAt(index)
+                            ..refresh();
+                        }
+                      },
+                    ),
                   );
                 },
                 itemCount: response.length,

@@ -827,10 +827,13 @@ class _MemberPageState extends State<MemberPage> {
         // 个人主页一级 Tab「合集和系列」：直接复用既有 member_season_series
         // （SeasonSeriesPage → SeasonSeriesController → MemberHttp.seasonSeriesList
         //  → SeasonSeriesCard 自适应网格），未新增任何数据/接口实现。
-        // heroTag 传 null：页面自身不使用 heroTag，且「投稿」Tab 内的
-        // `全部合集/列表` 子页签会用同一个 _heroTag 注册同类型的
-        // SeasonSeriesController，传 null 可彻底避免 Getx 同 tag 重复注册冲突。
-        'ugcSeason' => SeasonSeriesPage(mid: _mid),
+        // heroTag 传 _heroTag：卡片打开的 MemberVideo 需要按 tag 找到本页注册的
+        // MemberController（`Get.find<MemberController>(tag: heroTag)`），
+        // 传 null 会抛 "MemberController" not found → 整页报错（画面全灰）。
+        'ugcSeason' => SeasonSeriesPage(
+          mid: _mid,
+          heroTag: _heroTag,
+        ),
         _ => Center(child: Text(item.title ?? '')),
       };
     }).toList(),

@@ -101,7 +101,10 @@ abstract class BaseVideoWebState<
                         controller.onLoadMore();
                       }
                       // TODO: dimension
-                      return VideoCardH(videoItem: response[index]);
+                      // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                      return gridDelegate.scaled(
+                        VideoCardH(videoItem: response[index]),
+                      );
                     },
                   ),
                 ],

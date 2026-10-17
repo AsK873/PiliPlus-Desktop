@@ -1,5 +1,6 @@
 import 'package:PiliPlus/common/skeleton/media_bangumi.dart';
 import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
+import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/desktop/desktop_content.dart';
 import 'package:PiliPlus/models/search/result.dart';
 import 'package:PiliPlus/pages/search_panel/controller.dart';
@@ -46,13 +47,22 @@ class _SearchPgcPanelState
     );
   }
 
-  late final gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
-    maxCrossAxisExtent: Grid.smallCardWidth * 2,
-    mainAxisExtent: 158,
+  /// 桌面端与首页同一算式（动态列数 + 整卡同比，见 [CardGridDelegate]）；
+  /// 非桌面端逐字沿用原口径（`baseCardWidth` = 原 `maxCrossAxisExtent`）。
+  /// 固定行高卡片：整卡高 = `158 · scale`，卡片内封面按行高等比（见 SearchPgcItem）。
+  late final gridDelegate = CardGridDelegate(
+    baseCardWidth: Grid.smallCardWidth * 2,
+    baseMainAxisExtent: 158,
+    baseContentExtent: 158,
+    childAspectRatio: Style.aspectRatio16x9,
+    mainAxisSpacing: 0,
+    crossAxisSpacing: 0,
   );
 
   @override
   Widget buildList(List<SearchPgcItemModel> list) {
+    // 与首页网格同一几何：卡片网格不限宽（铺满 Sidebar 右侧可用宽度），
+    // 列数按可用宽度动态决定、卡片整卡同比缩放。
     return desktopLimitSliver(
       SliverGrid.builder(
         gridDelegate: gridDelegate,
@@ -60,10 +70,12 @@ class _SearchPgcPanelState
           if (index == list.length - 1) {
             controller.onLoadMore();
           }
-          return SearchPgcItem(item: list[index]);
+          // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+          return gridDelegate.scaled(SearchPgcItem(item: list[index]));
         },
         itemCount: list.length,
       ),
+      maxWidth: double.infinity,
     );
   }
 

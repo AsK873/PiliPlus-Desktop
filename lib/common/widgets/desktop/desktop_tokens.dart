@@ -108,6 +108,75 @@ abstract final class DesktopTokens {
   static Color subtitleColor(ColorScheme cs, {bool selected = false}) =>
       selected ? cs.onSecondaryContainer : cs.onSurfaceVariant;
 
+  // ===== 桌面右栏「简介 + 相关推荐」整体尺寸基准（单一来源） =====
+  //
+  // 右栏（右栏顶部 UP 主区域 → 标题/展开 → 播放量/弹幕/日期 → 操作栏
+  //       → 「相关推荐」→ 推荐卡片）**共用同一个缩放系数**：
+  //
+  //   最终尺寸 = 右栏设计基准尺寸 × [sidePanelScale]
+  //
+  // 设计基准即「按右栏设计截图标注的 1.00 尺寸」（avatar 44 / 图标 26 /
+  // 行高 64 / 标题 22 / 次级文字 13）。乘一个统一系数后，右栏从上到下
+  // 一起变大，不会出现「上面放大、相关推荐另立一套尺寸」的情况。
+  //
+  // 固定值，不随窗口宽度变化：普通窗口与最大化窗口取值完全相同。
+  //
+  // 调整口径只需改这一个数：`sidePanel*` 系列与右栏 `_build*` 里的
+  // `sidePanelSp()` / `sidePanelFs()` 全部由它派生。
+
+  /// 右栏整体缩放系数（唯一来源）。
+  static const double sidePanelScale = 1.2;
+
+  /// 右栏栅格：把 4px 基准间距按右栏系数放大（12 → 14、16 → 19 …）。
+  static double sidePanelSp(double base) => (base * sidePanelScale).roundToDouble();
+
+  /// 右栏字号：把设计基准字号按右栏系数放大（13 → 16、18 → 22 …）。
+  static double sidePanelFs(double base) => (base * sidePanelScale).roundToDouble();
+
+  /// UP 主头像直径（基准 44 → 53）。
+  static final double sidePanelAvatarSize = sidePanelSp(44);
+
+  /// UP 主头像徽标（VIP / 认证）（基准 18 → 22）。
+  static final double sidePanelAvatarBadgeSize = sidePanelSp(18);
+
+  /// 操作栏（赞/币/藏/再看/分享）图标尺寸（基准 26 → 31）。
+  static final double sidePanelActionIconSize = sidePanelSp(26);
+
+  /// 操作栏图标占位 / 三连进度环尺寸（基准 36 → 43）。
+  static final double sidePanelActionIconBoxSize = sidePanelSp(36);
+
+  /// 操作栏行高：图标 + 标签 + 上下留白，保证不被裁切（基准 64 → 77）。
+  static final double sidePanelActionRowHeight = sidePanelSp(64);
+
+  /// 右栏主标题（视频标题 / 「相关推荐」）字号与行高（基准 18 / 26，固定不变：
+  /// 该档在上一轮已按截图定稿，本轮不再二次放大）。
+  static const double sidePanelTitleFontSize = 18;
+  static const double sidePanelTitleLineHeight = 26;
+
+  /// 右栏主标题字重（Medium；比正文重、比粗体轻）。
+  static const FontWeight sidePanelTitleFontWeight = FontWeight.w500;
+
+  /// 右栏 UP 主名称字号（基准 15 → 18）。
+  static final double sidePanelNameFontSize = sidePanelFs(15);
+
+  /// 右栏次级信息（播放量 / 弹幕 / 日期 / 关注数 / 操作栏标签）字号（基准 13 → 16）。
+  static final double sidePanelSecondaryFontSize = sidePanelFs(13);
+
+  /// 右栏「评论区」普通文字字号 —— 与右栏「数据」区域**同一基准**
+  /// （= [sidePanelSecondaryFontSize]，基准 13 → 16）。
+  ///
+  /// 评论组件（主评论 / 楼中楼 / 回复列表 / 排序栏 / 列表尾部提示）里的**普通文字**
+  /// 统一走 [replyTextFs]：右栏（桌面横屏）取本值，其它形态（移动 / 平板 / 竖屏）
+  /// 沿用各自原有字号，避免影响移动端既有排版。
+  static final double sidePanelReplyFontSize = sidePanelSecondaryFontSize;
+
+  /// 评论区普通文字字号：右栏用统一基准，其它形态回落到原字号 [fallback]。
+  ///
+  /// [fallback] 传该处**原有**的 `fontSize`（可为 null＝沿用主题默认），
+  /// 因此非右栏形态逐字不变。
+  static double? replyTextFs(bool isSidePanel, double? fallback) =>
+      isSidePanel ? sidePanelReplyFontSize : fallback;
+
   // ===== BottomSheet（桌面弹层，见 theme_utils 的 bottomSheetTheme） =====
 
   /// 桌面 BottomSheet 最大宽度

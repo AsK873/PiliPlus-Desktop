@@ -110,7 +110,19 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
     double? maxExtent,
   ) {
-    maxExtent ??= double.infinity;
+    // [RenderSliverPinnedHeader] 在「交叉轴尺寸变化」时会先以 null 触发一次
+    // 更新（见 rendering/sliver_persistent_header.dart 的 `_maxExtent == null`
+    // 分支），此时拿不到真实高度。原实现回退成 `double.infinity`，而
+    // `FlexibleSpaceBarSettings` 断言 `minExtent <= maxExtent` —— 在 Dart 中
+    // `infinity <= infinity` 为 **false**，会直接抛断言异常，该异常被渲染成
+    // `RenderErrorBox` 塞进 NestedScrollView 的 sliver 位，于是整页只剩一片
+    // 灰（个人主页「合集和系列」打开卡片即触发：push 新路由会改变交叉轴尺寸）。
+    // 这里改为回退到至少 [minExtent] 的**有限**值，与同一渲染对象 `_layout()`
+    // 里 `math.max(minExtent, ...)` 的口径一致；只有拿不到真实高度的那一帧
+    // 会用到它，随后就会被真实高度覆盖。
+    if (maxExtent == null || !maxExtent.isFinite) {
+      maxExtent = minExtent;
+    }
     final bool isScrolledUnder =
         overlapsContent ||
         forceElevated ||

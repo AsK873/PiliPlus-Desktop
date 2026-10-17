@@ -92,6 +92,7 @@ class _SearchArticlePanelState
 
   @override
   Widget buildList(List<SearchArticleItemModel> list) {
+    // 与首页网格一致：卡片网格不限宽、列数按可用宽度动态决定
     return desktopLimitSliver(
       SliverGrid.builder(
         gridDelegate: gridDelegate,
@@ -99,10 +100,12 @@ class _SearchArticlePanelState
           if (index == list.length - 1) {
             controller.onLoadMore();
           }
-          return SearchArticleItem(item: list[index]);
+          // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+          return gridDelegate.scaled(SearchArticleItem(item: list[index]));
         },
         itemCount: list.length,
       ),
+      maxWidth: double.infinity,
     );
   }
 

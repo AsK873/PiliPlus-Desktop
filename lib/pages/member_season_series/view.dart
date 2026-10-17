@@ -73,31 +73,34 @@ class _SeasonSeriesPageState extends State<SeasonSeriesPage>
                     _controller.onLoadMore();
                   }
                   SpaceSsModel item = response[index];
-                  return SeasonSeriesCard(
-                    item: item,
-                    onTap: () {
-                      bool isSeason = item.meta!.seasonId != null;
-                      dynamic id = isSeason
-                          ? item.meta!.seasonId
-                          : item.meta!.seriesId;
-                      Get.to(
-                        SimpleScaffold(
-                          appBar: AppBar(title: Text(item.meta!.name!)),
-                          body: ViewSafeArea(
-                            child: MemberVideo(
-                              type: isSeason
-                                  ? ContributeType.season
-                                  : ContributeType.series,
-                              heroTag: widget.heroTag,
-                              mid: widget.mid,
-                              seasonId: isSeason ? id : null,
-                              seriesId: isSeason ? null : id,
-                              title: item.meta!.name,
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    SeasonSeriesCard(
+                      item: item,
+                      onTap: () {
+                        bool isSeason = item.meta!.seasonId != null;
+                        dynamic id = isSeason
+                            ? item.meta!.seasonId
+                            : item.meta!.seriesId;
+                        Get.to(
+                          SimpleScaffold(
+                            appBar: AppBar(title: Text(item.meta!.name!)),
+                            body: ViewSafeArea(
+                              child: MemberVideo(
+                                type: isSeason
+                                    ? ContributeType.season
+                                    : ContributeType.series,
+                                heroTag: widget.heroTag,
+                                mid: widget.mid,
+                                seasonId: isSeason ? id : null,
+                                seriesId: isSeason ? null : id,
+                                title: item.meta!.name,
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   );
                 },
                 itemCount: response.length,

@@ -73,36 +73,40 @@ class _LaterSearchPageState
             controller.onLoadMore();
           }
           final item = list[index];
-          return desktopCard(
-            VideoCardHLater(
-              index: index,
-              videoItem: item,
-              ctr: controller,
-              onViewLater: (cid) {
-                PageUtils.toVideoPage(
-                  bvid: item.bvid,
-                  cid: cid,
-                  cover: item.pic,
-                  title: item.title,
-                  dimension: item.dimension,
-                  extraArguments: enablePlayAll
-                      ? {
-                          'oid': item.aid,
-                          'sourceType': SourceType.watchLater,
-                          'count': controller.count,
-                          'favTitle': '稍后再看',
-                          'mediaId': controller.mid,
-                          'desc': false,
-                          'isContinuePlaying': index != 0,
-                        }
-                      : const {'viewLater': true},
-                );
-              },
+          // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+          return gridDelegate.scaled(
+            desktopCard(
+              VideoCardHLater(
+                index: index,
+                videoItem: item,
+                ctr: controller,
+                onViewLater: (cid) {
+                  PageUtils.toVideoPage(
+                    bvid: item.bvid,
+                    cid: cid,
+                    cover: item.pic,
+                    title: item.title,
+                    dimension: item.dimension,
+                    extraArguments: enablePlayAll
+                        ? {
+                            'oid': item.aid,
+                            'sourceType': SourceType.watchLater,
+                            'count': controller.count,
+                            'favTitle': '稍后再看',
+                            'mediaId': controller.mid,
+                            'desc': false,
+                            'isContinuePlaying': index != 0,
+                          }
+                        : const {'viewLater': true},
+                  );
+                },
+              ),
             ),
           );
         },
         itemCount: list.length,
       ),
+      maxWidth: double.infinity,
     );
   }
 }

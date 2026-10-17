@@ -18,7 +18,6 @@ import 'package:PiliPlus/pages/video/introduction/ugc/widgets/action_item.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
-import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -415,22 +414,31 @@ class _PgcIntroPageState extends State<PgcIntroPage> {
             ),
           ),
           Obx(
-            () => ActionItem(
-              animation: introController.tripleAnimation,
-              icon: const Icon(FontAwesomeIcons.star),
-              selectIcon: const Icon(FontAwesomeIcons.solidStar),
-              onTap: () => introController.showFavBottomSheet(context),
-              // 桌面端长按 = 无动作（收藏面板仍由点击打开）
-              onLongPress: PlatformUtils.isMobile
-                  ? () => introController.showFavBottomSheet(
-                      context,
-                      isLongPress: true,
-                    )
-                  : null,
-              selectStatus: introController.hasFav.value,
-              semanticsLabel: '收藏',
-              text: NumUtils.numFormat(stat.favorite),
-            ),
+            () {
+              // 响应式状态必须在 Obx 回调内读取（否则 Obx 追踪不到依赖会报
+              // "improper use of a GetX"）；Builder 仅用于取按钮自身的
+              // BuildContext 作为桌面端 Popover 的定位锚点。
+              final hasFav = introController.hasFav.value;
+              return Builder(
+                builder: (btnContext) => ActionItem(
+                  animation: introController.tripleAnimation,
+                  icon: const Icon(FontAwesomeIcons.star),
+                  selectIcon: const Icon(FontAwesomeIcons.solidStar),
+                  // 短按：开启快速收藏时收藏至默认夹，否则打开收藏夹 Popover
+                  onTap: () => introController.showFavBottomSheet(btnContext),
+                  // 长按：仅在开启「快速收藏」时绑定（打开收藏夹 Popover）
+                  onLongPress: introController.enableQuickFav
+                      ? () => introController.showFavBottomSheet(
+                          btnContext,
+                          isLongPress: true,
+                        )
+                      : null,
+                  selectStatus: hasFav,
+                  semanticsLabel: '收藏',
+                  text: NumUtils.numFormat(stat.favorite),
+                ),
+              );
+            },
           ),
           Obx(
             () => ActionItem(

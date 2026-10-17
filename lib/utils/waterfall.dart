@@ -1,9 +1,13 @@
+import 'dart:math';
+
 import 'package:PiliPlus/common/skeleton/dynamic_card.dart';
 import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
 import 'package:PiliPlus/common/style.dart';
+import 'package:PiliPlus/common/widgets/desktop/desktop_card_scale.dart';
 import 'package:PiliPlus/common/widgets/sliver/sliver_constrained_cross_axis.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/grid.dart';
+import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:flutter/rendering.dart' show SliverConstraints;
 import 'package:material_ui/material_ui.dart';
 import 'package:waterfall_flow/waterfall_flow.dart'
@@ -26,12 +30,13 @@ mixin DynMixin {
     );
   }
 
-  late final skeDelegate = SliverGridDelegateWithExtentAndRatio(
+  /// 动态骨架：桌面端与内容网格同一列数/列宽口径（见 [CardGridDelegate]）。
+  late final skeDelegate = CardGridDelegate(
+    baseCardWidth: Grid.smallCardWidth * 2,
+    baseContentExtent: 50,
     crossAxisSpacing: 4,
     mainAxisSpacing: 4,
-    maxCrossAxisExtent: Grid.smallCardWidth * 2,
     childAspectRatio: Style.aspectRatio,
-    mainAxisExtent: 50,
   );
 
   Widget get dynSkeleton {
@@ -94,8 +99,23 @@ class SliverWaterfallFlowDelegateWithMaxCrossAxisExtent
       return crossAxisCount!;
     }
     this.crossAxisExtent = crossAxisExtent;
-    crossAxisCount = (crossAxisExtent / (maxCrossAxisExtent + crossAxisSpacing))
-        .ceil();
+    if (PlatformUtils.isDesktop) {
+      // 桌面端与首页同一列数算式（见 desktop_card_scale.dart 的
+      // kCardColumnPitchRatio）：n = round((W + G) / (pitch + G))，
+      // pitch = 设计基准卡宽 × 246/206。瀑布流的列宽 = (W − G·(n − 1)) / n，
+      // 由 SliverWaterfallFlow 内部按同一 n 均分；卡片高度仍由内容决定。
+      final pitch = maxCrossAxisExtent * kCardColumnPitchRatio;
+      crossAxisCount = max(
+        1,
+        ((crossAxisExtent + crossAxisSpacing) /
+                (pitch + crossAxisSpacing))
+            .round(),
+      );
+    } else {
+      // 移动端 / 平板：逐字沿用原口径。
+      crossAxisCount =
+          (crossAxisExtent / (maxCrossAxisExtent + crossAxisSpacing)).ceil();
+    }
     return crossAxisCount!;
   }
 

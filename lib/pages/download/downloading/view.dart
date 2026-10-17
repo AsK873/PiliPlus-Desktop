@@ -67,7 +67,7 @@ class _DownloadingPageState extends State<DownloadingPage>
           body: CustomScrollView(
             slivers: [
               ViewSliverSafeArea(
-                // M8：桌面内容限宽居中（正在缓存；默认 1480 = Style.contentMaxWidth）
+                // 与首页网格一致：卡片网格不限宽、列数按可用宽度动态决定
                 sliver: desktopLimitSliver(
                   Obx(() {
                     if (_waitDownloadQueue.isNotEmpty) {
@@ -77,25 +77,29 @@ class _DownloadingPageState extends State<DownloadingPage>
                         itemBuilder: (context, index) {
                           final entry = _waitDownloadQueue[index];
                           final isCurr = entry.cid == _downloadService.curCid;
-                          return DetailItem(
-                            entry: entry,
-                            downloadService: _downloadService,
-                            showTitle: true,
-                            isCurr: isCurr,
-                            onDelete: () => _downloadService.deleteDownload(
+                          // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                          return gridDelegate.scaled(
+                            DetailItem(
                               entry: entry,
-                              removeQueue: true,
-                              downloadNext:
-                                  isCurr &&
-                                  entry.status == DownloadStatus.downloading,
+                              downloadService: _downloadService,
+                              showTitle: true,
+                              isCurr: isCurr,
+                              onDelete: () => _downloadService.deleteDownload(
+                                entry: entry,
+                                removeQueue: true,
+                                downloadNext:
+                                    isCurr &&
+                                    entry.status == DownloadStatus.downloading,
+                              ),
+                              controller: this,
                             ),
-                            controller: this,
                           );
                         },
                       );
                     }
                     return const HttpError();
                   }),
+                  maxWidth: double.infinity,
                 ),
               ),
             ],

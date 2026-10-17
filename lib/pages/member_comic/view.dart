@@ -66,7 +66,10 @@ class _MemberComicState extends State<MemberComic>
                   if (index == response.length - 1) {
                     _controller.onLoadMore();
                   }
-                  return MemberComicItem(item: response[index]);
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    MemberComicItem(item: response[index]),
+                  );
                 },
                 itemCount: response.length,
               )

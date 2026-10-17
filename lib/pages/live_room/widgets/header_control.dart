@@ -133,7 +133,8 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
           child,
           ...?timeBatteryWidgets,
           const SizedBox(width: 10),
-          if (PlatformUtils.isDesktop && !plPlayerController.isDesktopPip)
+          // 置顶：桌面端通用（PiP 内同样可用）
+          if (PlatformUtils.isDesktop)
             Obx(() {
               final isAlwaysOnTop = plPlayerController.isAlwaysOnTop.value;
               return ComBtn(
@@ -151,6 +152,21 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
                         color: Colors.white,
                       ),
                 onTap: () => plPlayerController.setAlwaysOnTop(!isAlwaysOnTop),
+              );
+            }),
+          // 比例锁：仅 PiP 内提供，默认锁定（等比缩放）
+          if (PlatformUtils.isDesktop && plPlayerController.isDesktopPip)
+            Obx(() {
+              final lock = plPlayerController.pipLockAspectRatio.value;
+              return ComBtn(
+                height: btnHeight,
+                tooltip: lock ? '自由缩放' : '锁定比例',
+                icon: Icon(
+                  lock ? Icons.aspect_ratio : Icons.aspect_ratio_outlined,
+                  size: 18,
+                  color: Colors.white,
+                ),
+                onTap: () => plPlayerController.setPipLockAspectRatio(!lock),
               );
             }),
           if (isFullScreen || PlatformUtils.isDesktop)

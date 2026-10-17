@@ -573,19 +573,32 @@ class AudioController extends GetxController
   }
 
   @override
-  void showFavBottomSheet(BuildContext context, {bool isLongPress = false}) {
+  void showFavBottomSheet(
+    BuildContext context, {
+    bool isLongPress = false,
+    BuildContext? anchorContext,
+  }) {
     if (!isLogin) {
       SmartDialog.showToast('账号未登录');
       return;
     }
+    // 关闭「快速收藏」时长按不绑定动作，因此这里不会收到 isLongPress=true
     if (enableQuickFav) {
       if (!isLongPress) {
         actionFavVideo(isQuick: true);
       } else {
-        PageUtils.showFavBottomSheet(context: context, ctr: this);
+        PageUtils.showFavBottomSheet(
+          context: context,
+          ctr: this,
+          anchorContext: anchorContext,
+        );
       }
     } else if (!isLongPress) {
-      PageUtils.showFavBottomSheet(context: context, ctr: this);
+      PageUtils.showFavBottomSheet(
+        context: context,
+        ctr: this,
+        anchorContext: anchorContext,
+      );
     }
   }
 

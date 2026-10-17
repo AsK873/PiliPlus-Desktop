@@ -226,9 +226,12 @@ class _MemberVideoState extends State<MemberVideo>
                           index == response.length - 1) {
                         _controller.onLoadMore();
                       }
-                      return VideoCardHMemberVideo(
-                        videoItem: response[index],
-                        fromViewAid: _controller.fromViewAid,
+                      // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                      return gridDelegate.scaled(
+                        VideoCardHMemberVideo(
+                          videoItem: response[index],
+                          fromViewAid: _controller.fromViewAid,
+                        ),
                       );
                     },
                     itemCount: response.length,

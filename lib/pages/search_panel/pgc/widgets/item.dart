@@ -38,22 +38,32 @@ class SearchPgcItem extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  NetworkImgLayer(
-                    width: 111,
-                    height: 148,
-                    src: item.cover,
-                  ),
-                  PBadge(
-                    text: item.seasonTypeName,
-                    top: 6.0,
-                    right: 6.0,
-                    bottom: null,
-                    left: null,
-                  ),
-                ],
+              // 封面按「本卡可用行高」等比：桌面端整卡同比放大时封面一起放大
+              // （行高 = 网格 mainAxisExtent = 158 · scale）；非桌面端行高仍是
+              // 原来的 158 ⇒ 封面仍是 111×148，几何零变化。
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final thumbHeight = constraints.maxHeight.isFinite
+                      ? constraints.maxHeight
+                      : 148.0;
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      NetworkImgLayer(
+                        width: thumbHeight * 111 / 148,
+                        height: thumbHeight,
+                        src: item.cover,
+                      ),
+                      PBadge(
+                        text: item.seasonTypeName,
+                        top: 6.0,
+                        right: 6.0,
+                        bottom: null,
+                        left: null,
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(width: 10),
               Expanded(

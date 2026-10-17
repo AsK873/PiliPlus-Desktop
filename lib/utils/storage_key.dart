@@ -167,7 +167,9 @@ abstract final class SettingBoxKey {
       showWindowTitleBar = 'showWindowTitleBar',
       desktopVolume = 'desktopVolume',
       showTrayIcon = 'showTrayIcon',
-      uiScale = 'uiScale';
+      uiScale = 'uiScale',
+      // PiP 是否锁定视频宽高比（默认 true ＝ 保持既有等比缩放行为）
+      pipLockAspectRatio = 'pipLockAspectRatio';
 
   static const String subtitlePreferenceV2 = 'subtitlePreferenceV2',
       enableDragSubtitle = 'enableDragSubtitle',

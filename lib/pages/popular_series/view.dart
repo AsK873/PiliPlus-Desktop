@@ -47,9 +47,11 @@ class _PopularSeriesPageState extends State<PopularSeriesPage> with GridMixin {
           physics: ReloadScrollPhysics(controller: _controller),
           slivers: [
             ViewSliverSafeArea(
-              // 桌面端内容限宽居中（默认 1480 = Style.contentMaxWidth，超宽屏下不再横向铺满）
+              // 与首页网格一致：卡片网格不限宽（铺满 Sidebar 右侧可用宽度），
+              // 列数按可用宽度动态决定、卡片整卡同比缩放
               sliver: desktopLimitSliver(
                 Obx(() => _buildBody(_controller.loadingState.value)),
+                maxWidth: double.infinity,
               ),
             ),
           ],
@@ -70,27 +72,30 @@ class _PopularSeriesPageState extends State<PopularSeriesPage> with GridMixin {
             itemCount: response.length,
             itemBuilder: (context, index) {
               final item = response[index];
-              return desktopCard(
-                VideoCardH(
-                  videoItem: item,
-                  onTap: () {
-                    final config = _controller.config.value;
-                    PageUtils.toVideoPage(
-                      bvid: item.bvid,
-                      cid: item.cid!,
-                      dimension: item.dimension,
-                      extraArguments: {
-                        'sourceType': SourceType.playlist,
-                        'favTitle': '每周必看 ${config?.label ?? ''}',
-                        'mediaId': config?.mediaId,
-                        'desc': true,
-                        'oid': item.aid,
-                        'isContinuePlaying': index != 0,
-                      },
-                    );
-                  },
+              // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+              return gridDelegate.scaled(
+                desktopCard(
+                  VideoCardH(
+                    videoItem: item,
+                    onTap: () {
+                      final config = _controller.config.value;
+                      PageUtils.toVideoPage(
+                        bvid: item.bvid,
+                        cid: item.cid!,
+                        dimension: item.dimension,
+                        extraArguments: {
+                          'sourceType': SourceType.playlist,
+                          'favTitle': '每周必看 ${config?.label ?? ''}',
+                          'mediaId': config?.mediaId,
+                          'desc': true,
+                          'oid': item.aid,
+                          'isContinuePlaying': index != 0,
+                        },
+                      );
+                    },
+                  ),
+                  prefetchBvid: item.bvid,
                 ),
-                prefetchBvid: item.bvid,
               );
             },
           );

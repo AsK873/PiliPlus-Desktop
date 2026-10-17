@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
-import 'package:PiliPlus/common/widgets/desktop/desktop_card.dart';
 import 'package:PiliPlus/common/widgets/desktop/desktop_tokens.dart';
 import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
@@ -28,6 +27,7 @@ import 'package:PiliPlus/models_new/video/video_tag/data.dart';
 import 'package:PiliPlus/pages/common/common_intro_controller.dart';
 import 'package:PiliPlus/pages/danmaku/view.dart';
 import 'package:PiliPlus/pages/episode_panel/view.dart';
+import 'package:PiliPlus/common/widgets/image/image_save.dart';
 import 'package:PiliPlus/pages/video/ai_conclusion/view.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/local/controller.dart';
@@ -36,6 +36,7 @@ import 'package:PiliPlus/pages/video/introduction/pgc/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/pgc/view.dart';
 import 'package:PiliPlus/pages/video/introduction/pgc/widgets/intro_detail.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/controller.dart';
+import 'package:PiliPlus/http/user.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/view.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/page.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/season.dart';
@@ -72,17 +73,11 @@ import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, clampDouble;
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:screen_brightness_platform_interface/screen_brightness_platform_interface.dart';
-
-/// 右栏折叠 / 展开的键盘意图（Ctrl + Shift + B，仅播放器页生效）
-class _ToggleRightPanelIntent extends Intent {
-  const _ToggleRightPanelIntent();
-}
 
 class VideoDetailPageV extends StatefulWidget {
   const VideoDetailPageV({super.key});
@@ -123,68 +118,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       videoDetailController.plPlayerController.pipNoDanmaku;
 
   bool isShowing = true;
-
-  /// Windows 桌面端右栏折叠状态（仅当前页面生命周期，不持久化）
-  bool _rightPanelCollapsed = false;
-
-  /// 是否处于「桌面横屏双栏」布局 —— 只有这种布局才有可折叠的右栏
-  /// （竖屏视频的三列布局不改动，不提供折叠）
-  bool get _canFoldPanel =>
-      PlatformUtils.isDesktop &&
-      !isPortrait &&
-      videoDetailController.horizontalScreen &&
-      maxWidth / maxHeight >= kScreenRatio &&
-      !(enableVerticalExpand && videoDetailController.isVertical.value);
-
-  void _toggleRightPanel() =>
-      setState(() => _rightPanelCollapsed = !_rightPanelCollapsed);
-
-  /// Ctrl + Shift + B：与右上角折叠按钮、右缘展开把手共用 [_toggleRightPanel]
-  /// （同一份状态，无第二套逻辑）
-  void _onToggleRightPanelShortcut() {
-    // 焦点在可编辑控件（搜索框 / 评论框 / 发弹幕等）时不响应
-    if (_isEditingText) return;
-    // 全屏（右栏本来就不显示）或非「桌面双栏」布局时不改变布局，
-    // 退出全屏后右栏状态保持进入全屏前的样子
-    if (isFullScreen || !_canFoldPanel) return;
-    _toggleRightPanel();
-  }
-
-  /// 主焦点是否位于可编辑文本控件内
-  bool get _isEditingText {
-    final context = FocusManager.instance.primaryFocus?.context;
-    if (context == null) return false;
-    return context.widget is EditableText ||
-        context.findAncestorStateOfType<EditableTextState>() != null;
-  }
-
-  /// 桌面右栏折叠把手宽度 / 高度（紧凑，贴播放器右缘垂直居中）
-  static const double _sidePanelHandleWidth = 24;
-  static const double _sidePanelHandleHeight = 56;
-
-  /// 折叠态的「展开右栏」把手：复用 Desktop UI Kit 的 [DesktopCard]
-  /// （底色 + 描边 + 圆角 + 悬停），贴在播放器右缘、垂直居中，
-  /// 避开播放器上/下控制条，不会遮挡任何播放器控件。
-  Widget _sidePanelHandle({required double centerY}) => Positioned(
-    top: centerY - _sidePanelHandleHeight / 2,
-    right: DesktopTokens.gap8,
-    child: Tooltip(
-      message: '展开右栏',
-      child: DesktopCard(
-        padding: EdgeInsets.zero,
-        onTap: _toggleRightPanel,
-        child: SizedBox(
-          width: _sidePanelHandleWidth,
-          height: _sidePanelHandleHeight,
-          child: Icon(
-            Icons.keyboard_double_arrow_left_rounded,
-            size: 18,
-            color: DesktopTokens.subtitleColor(colorScheme),
-          ),
-        ),
-      ),
-    ),
-  );
 
   bool get isFullScreen =>
       videoDetailController.plPlayerController.isFullScreen.value;
@@ -664,7 +597,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                         videoIntro(isHorizontal: false, needCtr: false),
                         if (videoDetailController.showReply)
                           videoReplyPanel(isNested: true),
-                        if (_shouldShowSeasonPanel) seasonPanel,
+                        // 播放列表已改为右栏固定区域，不再是页签视图的子项
                       ],
                     ),
                   ),
@@ -843,41 +776,12 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   /// 折叠态播放器：播放器区域铺满整页可用区域；视频本体仍由播放器内部按
   /// 原始 16:9 contain 居中显示（不拉伸、不裁剪、比例不变），因此不会在播放器
   /// 之外留下不属于任何区域的空缺。右缘把手叠加在播放器之上。
-  Widget _collapsedPlayer({
-    required double width,
-    required double height,
-  }) {
-    return SizedBox(
-      width: width,
-      height: height,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          videoPlayer(
-            width: width,
-            height: height,
-          ),
-          _sidePanelHandle(centerY: height / 2),
-        ],
-      ),
-    );
-  }
-
-  Widget childSplit(double ratio, {bool allowCollapse = false}) {
+  Widget childSplit(double ratio) {
     final double videoHeight = maxHeight - padding.vertical;
     final double width = videoHeight * ratio;
     final videoWidth = isFullScreen ? maxWidth : width;
     final introWidth = maxWidth - width - padding.horizontal;
     // 桌面右栏折叠：右栏 0 宽，播放器按整页可用区域重算并取最大尺寸
-    if (allowCollapse &&
-        _rightPanelCollapsed &&
-        _canFoldPanel &&
-        !isFullScreen) {
-      return MiniScaffold(
-        key: videoDetailController.childKey,
-        body: _collapsedPlayer(width: maxWidth, height: videoHeight),
-      );
-    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -899,7 +803,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
               body: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  buildTabBar(showPanelToggle: allowCollapse && _canFoldPanel),
+                  _panelContextMenu(buildTabBar()),
                   Expanded(
                     child: tabBarView(
                       controller: videoDetailController.tabCtr,
@@ -910,7 +814,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                           height: maxHeight,
                         ),
                         if (videoDetailController.showReply) videoReplyPanel(),
-                        if (_shouldShowSeasonPanel) seasonPanel,
+                        // 播放列表已改为右栏固定区域，不再是页签视图的子项
                       ],
                     ),
                   ),
@@ -971,7 +875,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                             children: [
                               if (videoDetailController.showReply)
                                 videoReplyPanel(),
-                              if (_shouldShowSeasonPanel) seasonPanel,
+                              // 播放列表已改为右栏固定区域，不再是页签视图的子项
                             ],
                           ),
                         ),
@@ -996,9 +900,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     if (maxWidth >= 560) {
       width = maxWidth - clampDouble(maxWidth - width, 280, 425);
     }
-    // 桌面右栏折叠：展开态布局（左栏播放器 + 下方信息区 + 右栏）保持原样，
-    // 只在折叠分支里把左栏约束整体换为「整页可用区域」。
-    final collapsed = _rightPanelCollapsed && !isFullScreen && _canFoldPanel;
     final videoWidth = isFullScreen ? maxWidth : width;
     final double height = width / Style.aspectRatio16x9;
     final double fullHeight = maxHeight - padding.top;
@@ -1006,7 +907,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         ? maxHeight - (isWindowMode && !isPortrait ? 0 : padding.top)
         : height;
     if (height > maxHeight) {
-      return childSplit(Style.aspectRatio16x9, allowCollapse: true);
+      return childSplit(Style.aspectRatio16x9);
     }
     // 右栏宽度（信息区迁到右栏后仍沿用原有宽度算法，本轮不重新设计右栏宽度）
     final introWidth = maxWidth - width - padding.horizontal;
@@ -1023,15 +924,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         height: playerBoxHeight,
       ),
     );
-    if (collapsed) {
-      // 折叠态：只渲染播放器（整页可用区域 = 右栏释放出的宽度 + 全部高度），
-      // 不渲染信息区、标签栏、相关推荐；childKey 由这里的 MiniScaffold 接管，
-      // 保证播放器控制栏里的播放列表 / 视角等底部弹层仍能正常弹出
-      return MiniScaffold(
-        key: videoDetailController.childKey,
-        body: _collapsedPlayer(width: maxWidth, height: fullHeight),
-      );
-    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1049,9 +941,10 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                   // 1) 标签栏固定在最顶部（评论 / 播放列表都在其中）
                   // 该页签已承载 UP主 → 标题 → 统计 → 视频简介 → 操作栏 → 相关推荐，
                   // 因此桌面端文案用「简介」；移动端 / 平板沿用原文案，行为完全不变
-                  buildTabBar(
-                    introText: PlatformUtils.isDesktop ? '简介' : '相关视频',
-                    showPanelToggle: _canFoldPanel,
+                  _panelContextMenu(
+                    buildTabBar(
+                      introText: PlatformUtils.isDesktop ? '简介' : '相关视频',
+                    ),
                   ),
                   Expanded(
                     child: tabBarView(
@@ -1069,7 +962,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                           ),
                         ),
                         if (videoDetailController.showReply) videoReplyPanel(),
-                        if (_shouldShowSeasonPanel) seasonPanel,
+                        // 播放列表已改为右栏固定区域，不再是页签视图的子项
                       ],
                     ),
                   ),
@@ -1389,32 +1282,103 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     if (!PlatformUtils.isDesktop) {
       return content;
     }
-    // 桌面端右栏折叠快捷键 Ctrl + Shift + B（仅本页面 Focus 链上生效）：
-    //  - includeRepeats: false ⇒ 长按自动重复不会反复切换；
-    //  - 只在主焦点未被可编辑控件占用、且当前是桌面双栏布局时切换
-    //    （判断在 [_onToggleRightPanelShortcut] 内，与按钮/把手同一状态）；
-    //  - 与壳层 Ctrl+K / Ctrl+1..3、播放器单键快捷键、文本编辑默认快捷键
-    //    （Ctrl+B 需 shift 松开）均不冲突。
-    return Shortcuts(
-      shortcuts: const <ShortcutActivator, Intent>{
-        SingleActivator(
-          LogicalKeyboardKey.keyB,
-          control: true,
-          shift: true,
-          includeRepeats: false,
-        ): _ToggleRightPanelIntent(),
-      },
-      child: Actions(
-        actions: <Type, Action<Intent>>{
-          _ToggleRightPanelIntent: CallbackAction<_ToggleRightPanelIntent>(
-            onInvoke: (_) {
-              _onToggleRightPanelShortcut();
-              return null;
-            },
+    return content;
+  }
+
+  /// 右栏顶部标签栏区域的桌面右键菜单：查看封面 / AI总结 / 稍后再看（顺序固定）。
+  ///
+  /// 复用项目现有菜单体系（[showMenu] + [PopupMenuItem]，与
+  /// `common/widgets/video_popup_menu.dart` 同款），三个动作全部复用既有实现，
+  /// 不新增业务逻辑；仅替换原「收起右栏」入口。左键行为不受影响。
+  Widget _panelContextMenu(Widget child) {
+    if (!PlatformUtils.isDesktop) {
+      return child;
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onSecondaryTapDown: (details) =>
+          _showPanelContextMenu(details.globalPosition),
+      child: child,
+    );
+  }
+
+  Future<void> _showPanelContextMenu(Offset globalPos) async {
+    final videoDetail = ugcIntroController.videoDetail.value;
+    final bvid = videoDetail.bvid;
+    final cid = videoDetail.cid;
+    final overlay = Overlay.maybeOf(context)?.context.findRenderObject();
+    if (overlay is! RenderBox) {
+      return;
+    }
+    final local = overlay.globalToLocal(globalPos);
+    await showMenu<void>(
+      context: context,
+      position: RelativeRect.fromLTRB(local.dx, local.dy, local.dx, local.dy),
+      items: [
+        PopupMenuItem(
+          height: 45,
+          onTap: () => imageSaveDialog(
+            title: videoDetail.title,
+            cover: videoDetail.pic,
+            aid: videoDetail.aid,
+            bvid: bvid,
           ),
-        },
-        child: content,
-      ),
+          child: const Row(
+            children: [
+              Icon(Icons.image_outlined, size: 16),
+              SizedBox(width: 6),
+              Text('查看封面', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          height: 45,
+          onTap: () async {
+            if (bvid == null || cid == null) {
+              return;
+            }
+            final res = await UgcIntroController.getAiConclusion(
+              bvid,
+              cid,
+              videoDetail.owner?.mid,
+            );
+            if (res != null && mounted) {
+              showDialog(
+                context: context,
+                builder: (context) => Dialog(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: AiConclusionPanel.buildContent(
+                      context,
+                      Theme.of(context),
+                      res,
+                      tap: false,
+                    ),
+                  ),
+                ),
+              );
+            }
+          },
+          child: const Row(
+            children: [
+              Icon(Icons.auto_awesome_outlined, size: 16),
+              SizedBox(width: 6),
+              Text('AI总结', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          height: 45,
+          onTap: () => UserHttp.toViewLater(bvid: bvid),
+          child: const Row(
+            children: [
+              Icon(Icons.watch_later_outlined, size: 16),
+              SizedBox(width: 6),
+              Text('稍后再看', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1423,13 +1387,14 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     String? introText,
     bool showIntro = true,
     VoidCallback? onTap,
-    bool showPanelToggle = false,
   }) {
     final tabs = [
       if (showIntro)
         videoDetailController.isFileSource ? '离线视频' : introText ?? '简介',
       if (videoDetailController.showReply) '评论',
-      if (_shouldShowSeasonPanel) '播放列表',
+      // 说明：原「播放列表」页签已移除 —— 播放列表改为固定渲染在右栏
+      // 「三连」下方、「相关推荐」上方（见 [seasonPlaylist]），
+      // 不再占用顶部工具栏页签。
     ];
     if (videoDetailController.tabCtr.length != tabs.length) {
       videoDetailController.tabCtr.dispose();
@@ -1590,23 +1555,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                 },
               ),
             ),
-            // 桌面右栏折叠按钮（右栏顶部，紧凑图标按钮；仅桌面双栏布局传入 true）
-            if (showPanelToggle)
-              SizedBox.square(
-                dimension: 32,
-                child: IconButton(
-                  tooltip: '收起右栏',
-                  style: const ButtonStyle(
-                    padding: WidgetStatePropertyAll(.zero),
-                  ),
-                  onPressed: _toggleRightPanel,
-                  icon: Icon(
-                    size: 18,
-                    Icons.keyboard_double_arrow_right_rounded,
-                    color: DesktopTokens.subtitleColor(colorScheme),
-                  ),
-                ),
-              ),
             const SizedBox(width: 14),
           ],
         ),
@@ -1820,12 +1768,22 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
             onShowMemberPage: onShowMemberPage,
             isPortrait: isPortrait,
             isHorizontal: isHorizontal ?? width! / height! >= kScreenRatio,
+            // 桌面右栏：播放列表（分P / 合集）作为独立固定高度区域，
+            // 排在「三连」下方、「相关推荐」上方
+            seasonPlaylist: seasonPlaylist,
           ),
           if (needRelated && videoDetailController.showRelatedVideo) ...[
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(
-                  top: Style.safeSpace,
+                // 播放列表 / 信息区 与「相关推荐」之间的区块留白：桌面右栏恢复
+                // 常规留白（不再使用 3px 紧凑间距），使其下方的水平分隔线清晰可见；
+                // 移动端 / 平板沿用原有 safeSpace，行为不变。
+                padding: EdgeInsets.only(
+                  top: PlatformUtils.isDesktop && !isPortrait
+                      ? DesktopTokens.sidePanelSp(20)
+                      : (PlatformUtils.isDesktop
+                            ? DesktopTokens.sidePanelSp(Style.safeSpace)
+                            : Style.safeSpace),
                 ),
                 child: Divider(
                   height: 1,
@@ -1840,25 +1798,30 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                 ),
               ),
             ),
-            // 桌面右栏：「相关推荐」Section Title —— 与「视频简介」同一套
-            // DesktopTokens 风格（fontRowTitle + w600 + titleColor），
-            // 水平基准与信息区一致（左右各 gap12）
+            // 桌面右栏：「相关推荐」Section Title —— 与右栏「视频标题」**同一视觉
+            // 等级**：同一份 DesktopTokens 标题规格（18 / 行高 26 / Medium /
+            // 主文字色），不随窗口二次放大。
+            // 标题上下留白随右栏整体系数放大（gap12 → sidePanelSp(12)），
+            // 与推荐卡片一起构成「整个右栏一起放大」的观感。
             if (PlatformUtils.isDesktop && !isPortrait)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
+                  padding: EdgeInsets.fromLTRB(
                     DesktopTokens.gap12,
+                    DesktopTokens.sidePanelSp(DesktopTokens.gap12),
                     DesktopTokens.gap12,
-                    DesktopTokens.gap12,
-                    DesktopTokens.gap8,
+                    DesktopTokens.sidePanelSp(DesktopTokens.gap12),
                   ),
                   child: Text(
                     '相关推荐',
                     maxLines: 1,
                     overflow: .ellipsis,
                     style: TextStyle(
-                      fontSize: DesktopTokens.fontRowTitle,
-                      fontWeight: .w600,
+                      fontSize: DesktopTokens.sidePanelTitleFontSize,
+                      height:
+                          DesktopTokens.sidePanelTitleLineHeight /
+                          DesktopTokens.sidePanelTitleFontSize,
+                      fontWeight: DesktopTokens.sidePanelTitleFontWeight,
                       color: DesktopTokens.titleColor(colorScheme),
                     ),
                   ),
@@ -1931,8 +1894,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     return KeepAliveWrapper(child: child);
   }
 
-  Widget get seasonPanel {
-    final videoDetail = ugcIntroController.videoDetail.value;
+  Widget get seasonPanel {    final videoDetail = ugcIntroController.videoDetail.value;
     return KeepAliveWrapper(
       child: Column(
         children: [
@@ -2034,6 +1996,131 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     isNested: isNested,
     heroTag: heroTag,
   );
+
+  /// 播放列表（选集）高度上限：留出右栏顶部信息区与下方「相关推荐/推荐视频」
+  /// 的可见空间。
+  ///
+  /// 说明：上一轮曾按「下移两张卡片」把它抬高到 `280 + sidePanelSp(24)`，
+  /// 那会造成「选集 → 相关推荐」之间一段固定的异常空白；本轮按实际布局回调为
+  /// 原始上限 280，段落间距只由「分隔线留白 + 相关推荐标题留白」自然构成。
+  static const double _kSeasonPlaylistMaxHeight = 280;
+
+  /// 右栏标签栏高度：与 [buildTabBar] 的 `SizedBox(height: 45)` 对齐。
+  /// 右栏实际滚动视口 = client 高度 − 本值（桌面窗口无 viewPadding.top）。
+  static const double _kRightPanelTabBarHeight = 45;
+
+  /// 播放列表可叠加 [_kSeasonPlaylistExtra] 所需的最小右栏滚动视口
+  /// （等价 client 高度 **1022.2** = 977.2 + 45）：视口低于此值时只使用
+  /// 基础高度（280），普通窗口因此仍能完整显示一张推荐卡片。
+  ///
+  /// 口径（与当前区块留白一致）：
+  /// `首卡定位 = 信息区（简介折叠态，约 243）+ 播放列表上方 10
+  ///  + 播放列表 540.8 + 下方 87 = 880.8`；再加一张完整卡片
+  /// `96.4（= 缩略图 86.4 + 卡片间隙 10）` ⇒ **977.2**。
+  /// 即视口恰为 977.2 时首卡可见高度正好 96.4（整张卡片），阈值以上严格成立。
+  ///
+  /// 当前两个验收态：普通窗口视口 729（< 阈值 ⇒ 280）；
+  /// 最大化视口 1324（≥ 阈值 ⇒ 540.8）。
+  static const double _kSeasonPlaylistMinViewport = 977.2;
+
+  /// 播放列表目标高度增量（**仅当右栏滚动视口 ≥ [_kSeasonPlaylistMinViewport] 时叠加**）。
+  ///
+  /// = 2 张推荐卡片节距（`2 × (缩略图 86.4 + 卡片间隙 10) = 192.8`）
+  /// + 「区块间距统一」回收的区块间隙（播放列表上方 `20 − 3 = 17`；
+  ///   下方 `24 + 1 + 14 + 26 + 14 + 8 = 87` → `3 + 1 + 3 + 26 + 3 + 0 = 36`，即 51）
+  /// = **260.8** ⇒ 目标高度 = 上限 280 + 260.8 = **540.8**（客户区像素），
+  /// 同时使「相关推荐」可视高度**恰好减少 192.8**（= 2 张卡片）。
+  static const double _kSeasonPlaylistExtra = 260.8;
+
+  /// 桌面右栏「播放列表」独立区域（分P / 合集通用）：
+  ///
+  /// - **固定高度**（取「可视高度的 38%」与 [_kSeasonPlaylistMaxHeight] 的较小值，
+  ///   并夹在 160~上限之间）：不会无限撑开右栏，相关推荐与推荐视频始终留有空间；
+  /// - **自身滚动**：内部仍是既有的 [EpisodePanel]（自带竖向 `CustomScrollView`），
+  ///   滚轮落在列表内只滚列表本身，**不推动**下方的相关推荐；
+  ///   鼠标移出该区域后，滚轮重新交给右栏主滚动视图（原有滚动行为）；
+  /// - **滚动条**：仅本区域覆盖 [ScrollbarThemeData.thumbVisibility] = false，
+  ///   即「默认隐藏、滚动时短暂显示」；不改动全局常显细条设置。
+  ///
+  /// 只在「桌面 + 横屏 + 分P/合集列表显示在 Tab 栏」时构造，其余情况返回 null
+  /// （移动端 / 平板 / 竖屏布局完全不变）。
+  Widget? get seasonPlaylist {
+    if (!_shouldShowSeasonPanel) {
+      return null;
+    }
+    final videoDetail = ugcIntroController.videoDetail.value;
+    if (videoDetail.bvid == null) {
+      return null;
+    }
+    final bool isSeason = videoDetail.ugcSeason != null;
+    if (!isSeason && (videoDetail.pages?.length ?? 0) <= 1) {
+      return null;
+    }
+    // 固定高度：不无限撑开右栏。基础高度沿用原算式（视高 38%，夹在 160~上限）；
+    // 仅当右栏滚动视口足够高、增高后仍能完整显示至少一张推荐卡片时，
+    // 才叠加固定增量（见 [_kSeasonPlaylistMinViewport] / [_kSeasonPlaylistExtra]）。
+    final double clientHeight = MediaQuery.sizeOf(context).height;
+    final double base = clampDouble(
+      clientHeight * 0.38,
+      160,
+      _kSeasonPlaylistMaxHeight,
+    );
+    final double height =
+        clientHeight - _kRightPanelTabBarHeight >= _kSeasonPlaylistMinViewport
+        ? base + _kSeasonPlaylistExtra
+        : base;
+    return KeepAliveWrapper(
+      child: SizedBox(
+        height: height,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(DesktopTokens.radius),
+          child: ScrollbarTheme(
+            data: const ScrollbarThemeData(
+              thumbVisibility: WidgetStatePropertyAll(false),
+            ),
+            child: EpisodePanel(
+              heroTag: heroTag,
+              enableSlide: false,
+              ugcIntroController: videoDetailController.isUgc
+                  ? ugcIntroController
+                  : null,
+              type: isSeason ? EpisodeType.season : EpisodeType.part,
+              initialTabIndex: isSeason
+                  ? videoDetailController.seasonIndex.value
+                  : 0,
+              cover: videoDetailController.cover.value,
+              seasonId: isSeason ? videoDetail.ugcSeason!.id : null,
+              list: isSeason
+                  ? videoDetail.ugcSeason!.sections!
+                  : [videoDetail.pages!],
+              bvid: videoDetailController.bvid,
+              aid: videoDetailController.aid,
+              cid: isSeason
+                  ? (videoDetailController.seasonCid ?? 0)
+                  : videoDetailController.cid.value,
+              isReversed: isSeason
+                  ? ugcIntroController
+                        .videoDetail
+                        .value
+                        .ugcSeason!
+                        .sections![videoDetailController.seasonIndex.value]
+                        .isReversed
+                  : videoDetail.isPageReversed,
+              onChangeEpisode: videoDetailController.isUgc
+                  ? ugcIntroController.onChangeEpisode
+                  : pgcIntroController.onChangeEpisode,
+              // 列表内已是右栏上下文：不显示头部标题（避免与右栏其它标题重复）
+              showTitle: false,
+              // 内嵌小视口：底部留白收紧（弹层口径的 +100 在这里会占掉大半可视高度）
+              bottomPadding: DesktopTokens.sidePanelSp(8),
+              isSupportReverse: videoDetailController.isUgc,
+              onReverse: () => onReversePlay(isSeason: isSeason),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   // ai总结
   void showAiBottomSheet() {

@@ -85,6 +85,7 @@ class _SubDetailPageState extends State<SubDetailPage> with GridMixin {
       Loading() => gridSkeleton,
       Success(:final response) =>
         response != null && response.isNotEmpty
+            // 与首页网格一致：卡片网格不限宽、列数按可用宽度动态决定
             ? desktopLimitSliver(
                 SliverGrid.builder(
                   gridDelegate: gridDelegate,
@@ -92,14 +93,18 @@ class _SubDetailPageState extends State<SubDetailPage> with GridMixin {
                     if (index == response.length - 1) {
                       _subDetailController.onLoadMore();
                     }
-                    return desktopCard(
-                      SubVideoCardH(
-                        videoItem: response[index],
+                    // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                    return gridDelegate.scaled(
+                      desktopCard(
+                        SubVideoCardH(
+                          videoItem: response[index],
+                        ),
                       ),
                     );
                   },
                   itemCount: response.length,
                 ),
+                maxWidth: double.infinity,
               )
             : HttpError(onReload: _subDetailController.onReload),
       Error(:final errMsg) => HttpError(

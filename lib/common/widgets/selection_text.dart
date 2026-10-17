@@ -8,6 +8,8 @@ class SelectionText extends StatelessWidget {
     this.style,
     this.textAlign,
     this.contextMenuBuilder = openUrlMenuBuilder,
+    this.maxLines,
+    this.overflow,
   }) : textSpan = null;
 
   const SelectionText.rich(
@@ -16,6 +18,8 @@ class SelectionText extends StatelessWidget {
     this.style,
     this.textAlign,
     this.contextMenuBuilder = openUrlMenuBuilder,
+    this.maxLines,
+    this.overflow,
   }) : data = null;
 
   final String? data;
@@ -24,6 +28,12 @@ class SelectionText extends StatelessWidget {
   final TextAlign? textAlign;
   final SelectableRegionContextMenuBuilder? contextMenuBuilder;
 
+  /// 与 [Text.maxLines] 同义：为 null 时不限制行数（原行为，移动端/平板不变）。
+  final int? maxLines;
+
+  /// 与 [Text.overflow] 同义：为 null 时沿用 [Text] 默认值。
+  final TextOverflow? overflow;
+
   @override
   Widget build(BuildContext context) {
     return SelectionArea(
@@ -31,6 +41,8 @@ class SelectionText extends StatelessWidget {
       child: Text.rich(
         style: style,
         textAlign: textAlign,
+        maxLines: maxLines,
+        overflow: overflow,
         TextSpan(
           text: data,
           children: textSpan != null ? <InlineSpan>[textSpan!] : null,

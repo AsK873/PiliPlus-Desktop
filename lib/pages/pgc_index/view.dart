@@ -221,12 +221,14 @@ class _PgcIndexPageState extends State<PgcIndexPage>
     ],
   );
 
-  late final gridDelegate = SliverGridDelegateWithExtentAndRatio(
+  /// 桌面端与首页同一算式（动态列数 + 整卡同比，见 [CardGridDelegate]）；
+  /// 非桌面端逐字沿用原口径（`baseCardWidth` = 原 `maxCrossAxisExtent`）。
+  late final gridDelegate = CardGridDelegate(
+    baseCardWidth: Grid.smallCardWidth * 0.6,
+    baseContentExtent: MediaQuery.textScalerOf(context).scale(50),
     mainAxisSpacing: Style.cardSpace,
     crossAxisSpacing: Style.cardSpace,
-    maxCrossAxisExtent: Grid.smallCardWidth * 0.6,
     childAspectRatio: 0.75,
-    mainAxisExtent: MediaQuery.textScalerOf(context).scale(50),
   );
 
   Widget _buildList(LoadingState<List<PgcIndexItem>?> loadingState) {
@@ -240,7 +242,11 @@ class _PgcIndexPageState extends State<PgcIndexPage>
                   if (index == response.length - 1) {
                     _ctr.onLoadMore();
                   }
-                  return PgcCardVPgcIndex(item: response[index]);
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比
+                  // （非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    PgcCardVPgcIndex(item: response[index]),
+                  );
                 },
                 itemCount: response.length,
               )

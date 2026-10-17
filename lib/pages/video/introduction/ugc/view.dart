@@ -57,6 +57,7 @@ class UgcIntroPanel extends StatefulWidget {
     required this.onShowMemberPage,
     required this.isPortrait,
     required this.isHorizontal,
+    this.seasonPlaylist,
   });
   final String heroTag;
   final Function showAiBottomSheet;
@@ -64,6 +65,11 @@ class UgcIntroPanel extends StatefulWidget {
   final ValueChanged<int?> onShowMemberPage;
   final bool isPortrait;
   final bool isHorizontal;
+
+  /// 桌面右栏的「播放列表」独立区域（固定高度 + 自身滚动），
+  /// 由页面侧组装后传入，渲染位置固定在**三连下方、相关推荐上方**。
+  /// 为 null 时不占位（移动端 / 平板 / 竖屏 / 无分P无合集）。
+  final Widget? seasonPlaylist;
 
   @override
   State<UgcIntroPanel> createState() => _UgcIntroPanelState();
@@ -112,8 +118,11 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
       padding: EdgeInsets.only(
         left: DesktopTokens.gap12,
         right: DesktopTokens.gap12,
-        // 桌面右栏信息区：顶部留白按 4px 栅格收紧（移动端保持原值）
-        top: PlatformUtils.isDesktop && !isPortrait ? DesktopTokens.gap8 : 10,
+        // 桌面右栏信息区：顶部留白按 4px 栅格收紧（移动端保持原值），
+        // 并随右栏整体放大（gap8 → sidePanelSp(8)）
+        top: PlatformUtils.isDesktop && !isPortrait
+            ? DesktopTokens.sidePanelSp(DesktopTokens.gap8)
+            : 10,
       ),
       sliver: Obx(
         () {
@@ -137,9 +146,9 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                       videoDetail,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: DesktopTokens.sidePanelSp(8)),
                   _buildTitle(isLoading, isHorizontal, videoDetail),
-                  const SizedBox(height: 8),
+                  SizedBox(height: DesktopTokens.sidePanelSp(8)),
                   Stack(
                     clipBehavior: .none,
                     children: [
@@ -150,14 +159,13 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                   if (introController.showArgueMsg)
                     if (videoDetail.argueInfo?.argueMsg case final argueMsg?
                         when argueMsg.isNotEmpty) ...[
-                      const SizedBox(height: 2),
+                      SizedBox(height: DesktopTokens.sidePanelSp(2)),
                       _buildArgueInfo(argueMsg),
                     ],
                   // 桌面端两种布局（播放器下方信息区 / 右侧信息栏）统一走
                   // 「视频简介」标题行 + 可折叠正文：默认折叠，不进横向溢出
                   if (PlatformUtils.isDesktop && !isPortrait) ...[
-                    const SizedBox(height: 8),
-                    _buildIntroHeader(colorScheme),
+                    SizedBox(height: DesktopTokens.sidePanelSp(8)),
                     Obx(
                       () => AnimatedHeightWidgetExt(
                         expand: introController.expand.value,
@@ -203,14 +211,26 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                           ),
                   ),
                   // 点赞收藏转发 布局样式2
+                  //
+                  // 桌面右栏（!isHorizontal && 桌面 && 非竖屏）：这里的「数据 → 操作栏」
+                  // 间距（8）删除，操作栏**紧贴**数据下方（该段空白不再补回）。
+                  // 移动端 / 平板 / 竖屏保持原有的这段间距，行为不变。
                   if (!isHorizontal) ...[
-                    const SizedBox(height: 8),
+                    if (!(PlatformUtils.isDesktop && !isPortrait))
+                      const SizedBox(height: 8),
                     actionGrid(
                       context,
                       isLoading,
                       introController,
                       videoDetail.stat,
                     ),
+                  ],
+                  // 播放列表：独立固定高度区域，位于**三连下方、相关推荐上方**。
+                  // 操作栏 → 播放列表 只保留**唯一一处**区块留白（常规间距，
+                  // 不再叠加第二个 spacer）。
+                  if (widget.seasonPlaylist case final playlist?) ...[
+                    SizedBox(height: DesktopTokens.sidePanelSp(8)),
+                    playlist,
                   ],
                   // 合集
                   if (!isLoading &&
@@ -277,47 +297,49 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     );
   }
 
-  /// 桌面端「视频简介」标题行：左标题 + 右「展开 / 收起」按钮
+  /// 桌面端「展开 / 收起」按钮（原「视频简介」行右侧入口，现位于标题行右侧）。
   ///
-  /// 折叠状态复用 [UgcIntroController.expand]（设置项「默认展开视频简介」/
-  /// 「横屏自动展开视频简介」决定初值，默认折叠），因此与简介区点击展开、
-  /// 标题行数等既有行为保持同一份状态。
-  /// 标题用 [Expanded] 让位、按钮不设最小尺寸，窄栏（窗口化）下不会横向溢出。
-  Widget _buildIntroHeader(ColorScheme colorScheme) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            '视频简介',
-            maxLines: 1,
-            overflow: .ellipsis,
-            style: TextStyle(
-              fontSize: DesktopTokens.fontRowTitle,
-              fontWeight: .w600,
-              color: DesktopTokens.titleColor(colorScheme),
-            ),
+  /// 折叠状态复用 [UgcIntroController.expand]，与简介区点击展开保持同一份状态。
+  Widget _buildExpandButton() {
+    return Obx(() {
+      final expanded = introController.expand.value;
+      return TextButton.icon(
+        onPressed: introController.expand.toggle,
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.symmetric(
+            horizontal: DesktopTokens.sidePanelSp(6),
+          ),
+          minimumSize: Size.zero,
+          tapTargetSize: .shrinkWrap,
+          visualDensity: const VisualDensity(vertical: -2.5),
+          foregroundColor: colorScheme.primary,
+          // 右栏整体放大：展开/收起字号与右栏次级文字同一档
+          textStyle: TextStyle(
+            fontSize: DesktopTokens.sidePanelSecondaryFontSize,
           ),
         ),
-        const SizedBox(width: DesktopTokens.gap8),
-        Obx(() {
-          final expanded = introController.expand.value;
-          return TextButton.icon(
-            onPressed: introController.expand.toggle,
-            style: TextButton.styleFrom(
-              padding: const .symmetric(horizontal: 6),
-              minimumSize: Size.zero,
-              tapTargetSize: .shrinkWrap,
-              visualDensity: const VisualDensity(vertical: -2.5),
-              foregroundColor: colorScheme.primary,
-              textStyle: const TextStyle(fontSize: DesktopTokens.fontSecondary),
-            ),
-            icon: Icon(
-              expanded ? Icons.expand_less : Icons.expand_more,
-              size: 18,
-            ),
-            label: Text(expanded ? '收起' : '展开'),
-          );
-        }),
+        icon: Icon(
+          expanded ? Icons.expand_less : Icons.expand_more,
+          size: DesktopTokens.sidePanelSp(18),
+        ),
+        label: Text(expanded ? '收起' : '展开'),
+      );
+    });
+  }
+
+  /// 桌面端标题行：标题 + 右侧「展开 / 收起」（同一行，垂直居中）。
+  ///
+  /// - 标题 [Expanded] 优先占用剩余空间（自身仍最多 2 行 + 省略号），
+  ///   长标题不会挤压按钮，也不会与按钮重叠；
+  /// - 按钮不参与标题文本、不覆盖标题，始终完整显示；
+  /// - 两者之间保留明显水平间距（[DesktopTokens.gap16]），不紧贴。
+  Widget _buildTitleRow(Widget title) {
+    return Row(
+      crossAxisAlignment: .center,
+      children: [
+        Expanded(child: title),
+        const SizedBox(width: DesktopTokens.gap16),
+        _buildExpandButton(),
       ],
     );
   }
@@ -330,10 +352,22 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     if (isLoading) {
       return _buildVideoTitle(videoDetail);
     } else if (PlatformUtils.isDesktop && !isHorizontal) {
-      // 桌面右栏信息区：标题固定 2 行 + 省略号（不随简介展开变长）
-      return _buildVideoTitle(videoDetail);
+      // 桌面右栏信息区：标题默认固定 2 行 + 省略号；**展开后按实际内容自适应
+      // 高度、完整显示全部文字**（与简介的展开状态同一个 `introController.expand`），
+      // 收起后回到 2 行。字号 / 字体 / 行高 / 展开逻辑均不变；
+      // 标题变高后由外层 Column 自然把简介、三连、播放列表、相关推荐整体下推，
+      // 不会发生覆盖。
+      return Obx(
+        () => _buildTitleRow(
+          _buildVideoTitle(
+            videoDetail,
+            isSelectable: true,
+            isExpand: introController.expand.value,
+          ),
+        ),
+      );
     } else if (isHorizontal && PlatformUtils.isDesktop) {
-      return _buildVideoTitle(videoDetail, isSelectable: true);
+      return _buildTitleRow(_buildVideoTitle(videoDetail, isSelectable: true));
     }
     return Obx(
       () => ExpandablePanel(
@@ -361,19 +395,30 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
   }
 
   List<Widget> _infos(VideoDetailData videoDetail) => [
-    const SizedBox(height: 8, width: .infinity),
+    SizedBox(height: DesktopTokens.sidePanelSp(8), width: .infinity),
     GestureDetector(
       onTap: () => Utils.copyText('${videoDetail.bvid}'),
       child: Text(
         videoDetail.bvid ?? '',
-        style: TextStyle(fontSize: 14, color: colorScheme.secondary),
+        style: TextStyle(
+          fontSize: DesktopTokens.sidePanelFs(14),
+          color: colorScheme.secondary,
+        ),
       ),
     ),
     if (videoDetail.descV2 case final descV2? when descV2.isNotEmpty) ...[
-      const SizedBox(height: 8),
+      SizedBox(height: DesktopTokens.sidePanelSp(8)),
       SelectionText.rich(
         buildDesc(descV2),
-        style: const TextStyle(height: 1.4),
+        // 桌面右栏：「简介展开后的正文」字号与上方「数据」区域同一基准
+        // （sidePanelSecondaryFontSize，普通/最大化一致）；行高倍数与其余视觉
+        // 属性保持原样，仅统一字号。移动端/平板沿用原有默认字号。
+        style: TextStyle(
+          height: 1.4,
+          fontSize: PlatformUtils.isDesktop && !widget.isPortrait
+              ? DesktopTokens.sidePanelSecondaryFontSize
+              : null,
+        ),
       ),
     ],
     NoTranslucentArea(
@@ -415,11 +460,35 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     );
   }
 
+  /// 桌面右栏「简介」面板标题的**固定视觉规格**（以 426×1358 设计截图为准）：
+  /// 字号 18、字重 500（Medium）、行高 26px（= 26 / 18）、主文字色沿用
+  /// [DesktopTokens.titleColor]，最多 2 行 + 省略号；中文字距不额外压缩，
+  /// 字体沿用工程现有 Desktop 字体体系（不设 fontFamily、不新增字体文件）。
+  ///
+  /// 数值本身已提到 [DesktopTokens.sidePanelTitle*] 这一**单一来源**：
+  /// 右栏所有区块标题（本标题行、「相关推荐」）共用同一份规格，避免各写一套。
+  /// 移动 / 平板与播放器下方信息区仍为 [DesktopTokens.fontSectionTitle]。
+  /// 普通窗口与最大化窗口完全一致。
   Widget _buildVideoTitle(
     VideoDetailData videoDetail, {
     bool isExpand = false,
     bool isSelectable = false,
   }) {
+    final isDesktopPanel = PlatformUtils.isDesktop && !widget.isPortrait;
+    final titleStyle = TextStyle(
+      fontSize: isDesktopPanel
+          ? DesktopTokens.sidePanelTitleFontSize
+          : DesktopTokens.fontSectionTitle,
+      // 行高按 26px 目标值换算成倍数，保证两行整体高度 = 2 × 26px
+      height: isDesktopPanel
+          ? DesktopTokens.sidePanelTitleLineHeight /
+                DesktopTokens.sidePanelTitleFontSize
+          : null,
+      fontWeight: isDesktopPanel
+          ? DesktopTokens.sidePanelTitleFontWeight
+          : null,
+      color: DesktopTokens.titleColor(colorScheme),
+    );
     Widget child() {
       final videoLabel = videoDetailCtr.videoLabel.value;
       final textSpan = TextSpan(
@@ -497,20 +566,18 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
       if (isSelectable) {
         return SelectionText.rich(
           textSpan,
-          style: TextStyle(
-            fontSize: DesktopTokens.fontSectionTitle,
-            color: DesktopTokens.titleColor(colorScheme),
-          ),
+          style: titleStyle,
+          // 桌面右栏标题：支持鼠标选择复制，同时保持原有 2 行 + 省略号；
+          // 展开态沿用不限行数的原逻辑。
+          maxLines: isExpand ? null : 2,
+          overflow: isExpand ? null : .ellipsis,
         );
       }
       return Text.rich(
         textSpan,
         maxLines: isExpand ? null : 2,
         overflow: isExpand ? null : .ellipsis,
-        style: TextStyle(
-          fontSize: DesktopTokens.fontSectionTitle,
-          color: DesktopTokens.titleColor(colorScheme),
-        ),
+        style: titleStyle,
       );
     }
 
@@ -545,7 +612,8 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
               -10 => '特别关注',
               _ => ' 关注 ',
             },
-            style: const TextStyle(fontSize: 13),
+            // 右栏整体放大：关注按钮文字与右栏次级文字同一档
+            style: TextStyle(fontSize: DesktopTokens.sidePanelSecondaryFontSize),
           ),
         );
       },
@@ -559,8 +627,9 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     VideoStat? stat,
   ) {
     return SizedBox(
-      // 桌面操作栏统一行高（Desktop UI Kit 的列表行高 token）
-      height: DesktopTokens.rowHeight,
+      // 桌面操作栏统一行高（Desktop UI Kit 的列表行高 token）；
+      // 右栏放大时行高同比放大，避免图标/文字被行高挤出
+      height: DesktopTokens.sidePanelActionRowHeight,
       child: Row(
         crossAxisAlignment: .start,
         children: [
@@ -603,23 +672,34 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
             ),
           ),
           Obx(
-            () => ActionItem(
-              animation: introController.tripleAnimation,
-              desktopTokens: true,
-              icon: const Icon(FontAwesomeIcons.star),
-              selectIcon: const Icon(FontAwesomeIcons.solidStar),
-              onTap: () => introController.showFavBottomSheet(context),
-              // 桌面端长按 = 无动作（收藏面板仍由点击打开）
-              onLongPress: PlatformUtils.isMobile
-                  ? () => introController.showFavBottomSheet(
-                      context,
-                      isLongPress: true,
-                    )
-                  : null,
-              selectStatus: introController.hasFav.value,
-              semanticsLabel: '收藏',
-              text: !isLoading ? NumUtils.numFormat(stat!.favorite) : null,
-            ),
+            () {
+              // 响应式状态必须在 Obx 回调内读取（否则 Obx 追踪不到依赖会报
+              // "improper use of a GetX"）；Builder 仅用于取按钮自身的
+              // BuildContext 作为桌面端 Popover 的定位锚点。
+              final hasFav = introController.hasFav.value;
+              return Builder(
+                builder: (btnContext) => ActionItem(
+                  animation: introController.tripleAnimation,
+                  desktopTokens: true,
+                  icon: const Icon(FontAwesomeIcons.star),
+                  selectIcon: const Icon(FontAwesomeIcons.solidStar),
+                  // 短按：开启快速收藏时收藏至默认夹，否则打开收藏夹 Popover
+                  onTap: () => introController.showFavBottomSheet(btnContext),
+                  // 长按：仅在开启「快速收藏」时绑定 —— 此时长按打开收藏夹 Popover；
+                  // 关闭时保持不绑定（长按不执行任何操作）。二者由 InkWell 的
+                  // 手势竞技场互斥，不会同时触发。
+                  onLongPress: introController.enableQuickFav
+                      ? () => introController.showFavBottomSheet(
+                          btnContext,
+                          isLongPress: true,
+                        )
+                      : null,
+                  selectStatus: hasFav,
+                  semanticsLabel: '收藏',
+                  text: !isLoading ? NumUtils.numFormat(stat!.favorite) : null,
+                ),
+              );
+            },
           ),
           Obx(
             () => ActionItem(
@@ -1002,13 +1082,13 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
         final userStat = introController.userStat.value;
         final isVip = (userStat.card?.vip?.status ?? 0) > 0;
         return Row(
-          spacing: 8,
+          spacing: DesktopTokens.sidePanelSp(8),
           mainAxisSize: .min,
           children: [
             PendantAvatar(
               userStat.card?.face,
-              size: 32,
-              badgeSize: 13,
+              size: DesktopTokens.sidePanelAvatarSize,
+              badgeSize: DesktopTokens.sidePanelAvatarBadgeSize,
               vipStatus: userStat.card?.vip?.status,
               officialType: userStat.card?.official?.type,
             ),
@@ -1020,7 +1100,7 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                   maxLines: 1,
                   overflow: .ellipsis,
                   style: TextStyle(
-                    fontSize: DesktopTokens.fontSecondary,
+                    fontSize: DesktopTokens.sidePanelNameFontSize,
                     // 桌面右栏视觉层级：UP 主名称（主文字色 + w500）强于
                     // 统计 / 简介正文（次级文字色），弱于视频标题
                     fontWeight: PlatformUtils.isDesktop && !widget.isPortrait
@@ -1036,7 +1116,7 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                 Text(
                   '${NumUtils.numFormat(userStat.follower)}粉丝    ${'${NumUtils.numFormat(userStat.archiveCount)}视频'}',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: DesktopTokens.sidePanelSecondaryFontSize,
                     color: DesktopTokens.subtitleColor(colorScheme),
                   ),
                 ),
@@ -1051,41 +1131,48 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
   Widget _buildInfo(VideoStat? stat, int? pubdate) {
     final subtitleColor = DesktopTokens.subtitleColor(colorScheme);
     return Row(
-      spacing: 10,
-      children: [
-        StatWidget(
-          type: .play,
-          value: stat?.view,
-          color: subtitleColor,
-        ),
-        StatWidget(
-          type: .danmaku,
-          value: stat?.danmaku,
-          color: subtitleColor,
-        ),
-        Text(
-          DateFormatUtils.format(pubdate),
-          style: TextStyle(
-            fontSize: 12,
-            color: subtitleColor,
-          ),
-        ),
-        if (MineController.anonymity.value)
-          Icon(
-            MdiIcons.incognito,
-            size: 15,
-            color: subtitleColor,
-            semanticLabel: '无痕',
-          ),
-        if (introController.isShowOnlineTotal)
-          Obx(
-            () => Text(
-              '${introController.total.value}人在看',
-              style: TextStyle(fontSize: 12, color: subtitleColor),
+      spacing: DesktopTokens.sidePanelSp(10),
+          children: [
+            StatWidget(
+              type: .play,
+              value: stat?.view,
+              color: subtitleColor,
+              iconSize: DesktopTokens.sidePanelSp(13),
+              fontSize: DesktopTokens.sidePanelSecondaryFontSize,
             ),
-          ),
-      ],
-    );
+            StatWidget(
+              type: .danmaku,
+              value: stat?.danmaku,
+              color: subtitleColor,
+              iconSize: DesktopTokens.sidePanelSp(13),
+              fontSize: DesktopTokens.sidePanelSecondaryFontSize,
+            ),
+            Text(
+              DateFormatUtils.format(pubdate),
+              style: TextStyle(
+                fontSize: DesktopTokens.sidePanelSecondaryFontSize,
+                color: subtitleColor,
+              ),
+            ),
+            if (MineController.anonymity.value)
+              Icon(
+                MdiIcons.incognito,
+                size: DesktopTokens.sidePanelSp(15),
+                color: subtitleColor,
+                semanticLabel: '无痕',
+              ),
+            if (introController.isShowOnlineTotal)
+              Obx(
+                () => Text(
+                  '${introController.total.value}人在看',
+                  style: TextStyle(
+                    fontSize: DesktopTokens.sidePanelSecondaryFontSize,
+                    color: subtitleColor,
+                  ),
+                ),
+              ),
+          ],
+        );
   }
 
   Widget get _aiBtn => Positioned(

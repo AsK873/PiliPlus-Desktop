@@ -96,16 +96,20 @@ class _FavSearchPageState
             controller.onLoadMore();
           }
           final item = list[index];
-          return desktopCard(
-            FavVideoCardH(
-              item: item,
-              index: index,
-              ctr: controller,
+          // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+          return gridDelegate.scaled(
+            desktopCard(
+              FavVideoCardH(
+                item: item,
+                index: index,
+                ctr: controller,
+              ),
             ),
           );
         },
         itemCount: list.length,
       ),
+      maxWidth: double.infinity,
     );
   }
 }

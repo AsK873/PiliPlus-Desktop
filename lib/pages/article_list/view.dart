@@ -77,7 +77,8 @@ class _ArticleListPageState extends State<ArticleListPage> with GridMixin {
             ? SliverGrid.builder(
                 gridDelegate: gridDelegate,
                 itemBuilder: (context, index) =>
-                    ArticleListItem(item: response[index]),
+                    // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                    gridDelegate.scaled(ArticleListItem(item: response[index])),
                 itemCount: response.length,
               )
             : HttpError(onReload: _controller.onReload),

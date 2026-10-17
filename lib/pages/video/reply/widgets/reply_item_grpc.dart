@@ -173,6 +173,8 @@ class ReplyItemGrpc extends StatelessWidget {
 
   Widget _buildHeader(BuildContext context, ColorScheme colorScheme) {
     final member = replyItem.member;
+    // 桌面播放器右栏：评论区普通文字与「数据」区域同一字号基准
+    final bool isSidePanel = PlatformUtils.isDesktop && !context.isPortrait;
     Widget header = GestureDetector(
       onTap: () {
         feedBack();
@@ -210,7 +212,8 @@ class ReplyItemGrpc extends StatelessWidget {
                           color: (member.vipStatus > 0 && member.vipType == 2)
                               ? colorScheme.vipColor
                               : colorScheme.outline,
-                          fontSize: 13,
+                          // 右栏：用户名与「数据」同号（移动端保持原有 13）
+                          fontSize: DesktopTokens.replyTextFs(isSidePanel, 13),
                         ),
                       ),
                     ),
@@ -252,7 +255,8 @@ class ReplyItemGrpc extends StatelessWidget {
                             )
                           : DateFormatUtils.dateFormat(replyItem.ctime.toInt()),
                       style: TextStyle(
-                        fontSize: 11,
+                        // 右栏：评论时间与「数据」同号（移动端保持原有 11）
+                        fontSize: DesktopTokens.replyTextFs(isSidePanel, 11),
                         color: colorScheme.outline,
                       ),
                     ),
@@ -260,7 +264,8 @@ class ReplyItemGrpc extends StatelessWidget {
                       Text(
                         ' • ${replyItem.replyControl.location}',
                         style: TextStyle(
-                          fontSize: 11,
+                          // 右栏：地区与「数据」同号（移动端保持原有 11）
+                          fontSize: DesktopTokens.replyTextFs(isSidePanel, 11),
                           color: colorScheme.outline,
                         ),
                       ),
@@ -318,9 +323,12 @@ class ReplyItemGrpc extends StatelessWidget {
   }
 
   Widget _buildVoteOption(
+    BuildContext context,
     ColorScheme colorScheme,
     ReplyControl_VoteOption voteOption,
   ) {
+    // 桌面播放器右栏：与「数据」同一字号基准
+    final bool isSidePanel = PlatformUtils.isDesktop && !context.isPortrait;
     return Text.rich(
       TextSpan(
         children: [
@@ -343,7 +351,8 @@ class ReplyItemGrpc extends StatelessWidget {
       ),
       style: TextStyle(
         height: 1.75,
-        fontSize: 12,
+        // 右栏：投票选项文字与「数据」同号（移动端保持原有 12）
+        fontSize: DesktopTokens.replyTextFs(isSidePanel, 12),
         color: colorScheme.onSurfaceVariant,
       ),
     );
@@ -362,7 +371,11 @@ class ReplyItemGrpc extends StatelessWidget {
         if (replyControl.hasVoteOption())
           Padding(
             padding: padding,
-            child: _buildVoteOption(colorScheme, replyControl.voteOption),
+            child: _buildVoteOption(
+              context,
+              colorScheme,
+              replyControl.voteOption,
+            ),
           ),
         // M8-19：桌面 → 原生可选中富文本（按住左键拖动框选任意连续文本，
         // 松开右键出复制/全选，Ctrl+C 也可用；行内表情支持）。
@@ -399,11 +412,24 @@ class ReplyItemGrpc extends StatelessWidget {
               child: PlatformUtils.isDesktop
                   ? SelectableText.rich(
                       replyTextSpan,
-                      style: const TextStyle(height: 1.75, fontSize: 14),
+                      // 右栏：评论正文与「数据」同号（移动端保持原有 14）
+                      style: TextStyle(
+                        height: 1.75,
+                        fontSize: DesktopTokens.replyTextFs(
+                          PlatformUtils.isDesktop && !context.isPortrait,
+                          14,
+                        ),
+                      ),
                     )
                   : TextMore.rich(
                       primary: colorScheme.primary,
-                      style: const TextStyle(height: 1.75, fontSize: 14),
+                      style: TextStyle(
+                        height: 1.75,
+                        fontSize: DesktopTokens.replyTextFs(
+                          PlatformUtils.isDesktop && !context.isPortrait,
+                          14,
+                        ),
+                      ),
                       maxLines: replyLevel == 1 ? replyLengthLimit : null,
                       replyTextSpan,
                     ),
@@ -534,7 +560,12 @@ class ReplyItemGrpc extends StatelessWidget {
   ) {
     final textStyle = TextStyle(
       height: 1,
-      fontSize: 12,
+      // 右栏：操作栏文字（回复 / 查看对话 / 翻译 / 标签）与「数据」同号
+      // （移动端保持原有 12）
+      fontSize: DesktopTokens.replyTextFs(
+        PlatformUtils.isDesktop && !context.isPortrait,
+        12,
+      ),
       fontWeight: .normal,
       color: colorScheme.outline,
     );
@@ -624,6 +655,8 @@ class ReplyItemGrpc extends StatelessWidget {
   ) {
     final extraRow = replies.length < replyItem.count.toInt();
     final length = replies.length + (extraRow ? 1 : 0);
+    // 桌面播放器右栏：楼中楼（嵌套回复）文字与「数据」同一字号基准
+    final bool isSidePanel = PlatformUtils.isDesktop && !context.isPortrait;
     return Padding(
       padding: const .only(left: 42, right: 4),
       child: Material(
@@ -717,7 +750,9 @@ class ReplyItemGrpc extends StatelessWidget {
                         return TextEllipsis.rich(
                           style: TextStyle(
                             height: 1.6,
-                            fontSize: 14,
+                            // 右栏：楼中楼正文（含用户名）与「数据」同号
+                            // （移动端保持原有 14）
+                            fontSize: DesktopTokens.replyTextFs(isSidePanel, 14),
                             color: colorScheme.onSurface.withValues(alpha: 0.85),
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -741,7 +776,10 @@ class ReplyItemGrpc extends StatelessWidget {
                       : const .fromLTRB(8, 5, 8, 8),
                   child: Text.rich(
                     TextSpan(
-                      style: const TextStyle(fontSize: 12),
+                      // 右栏：「共 x 条回复」与「数据」同号（移动端保持原有 12）
+                      style: TextStyle(
+                        fontSize: DesktopTokens.replyTextFs(isSidePanel, 12),
+                      ),
                       children: [
                         if (replyItem.replyControl.upReply)
                           TextSpan(

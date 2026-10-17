@@ -285,11 +285,13 @@ class _MainAppState extends PopScopeState<MainApp>
 
   @override
   void onWindowMaximize() {
+    PlPlayerController.instance?.markWindowChanged();
     _setting.put(SettingBoxKey.isWindowMaximized, true);
   }
 
   @override
   void onWindowUnmaximize() {
+    PlPlayerController.instance?.markWindowChanged();
     _setting.put(SettingBoxKey.isWindowMaximized, false);
   }
 
@@ -309,6 +311,7 @@ class _MainAppState extends PopScopeState<MainApp>
 
   @override
   Future<void> onWindowResized() async {
+    PlPlayerController.instance?.markWindowChanged();
     if (PlPlayerController.instance?.isDesktopPip ?? false) {
       return;
     }

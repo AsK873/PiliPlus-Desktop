@@ -1,8 +1,11 @@
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
+import 'package:PiliPlus/common/widgets/desktop/desktop_tokens.dart';
 import 'package:PiliPlus/http/reply.dart';
+import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
+import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -168,7 +171,12 @@ class ZanButtonGrpc extends StatelessWidget {
                   NumUtils.numFormat(replyItem.like.toInt()),
                   style: TextStyle(
                     color: isLike ? primary : outline,
-                    fontSize: theme.textTheme.labelSmall!.fontSize,
+                    // 桌面播放器右栏：点赞数与「数据」同一字号基准
+                    // （移动端仍走主题 labelSmall 原值）
+                    fontSize: DesktopTokens.replyTextFs(
+                      PlatformUtils.isDesktop && !context.isPortrait,
+                      theme.textTheme.labelSmall!.fontSize,
+                    ),
                   ),
                 ),
               ],

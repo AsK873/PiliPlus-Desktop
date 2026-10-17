@@ -451,9 +451,10 @@ class _FavPageState extends State<FavPage>
               top: 7,
               bottom: PlatformUtils.isDesktop ? 24 : padding.bottom + 100,
             ),
-            // 桌面端内容限宽居中（默认 1480 = Style.contentMaxWidth）
+            // 与首页网格一致：卡片网格不限宽、列数按可用宽度动态决定
             sliver: desktopLimitSliver(
               _buildSearchBody(ctr, ctr.loadingState.value),
+              maxWidth: double.infinity,
             ),
           ),
         ],
@@ -477,11 +478,14 @@ class _FavPageState extends State<FavPage>
                     ctr.onLoadMore();
                   }
                   final item = response[index];
-                  return desktopCard(
-                    FavVideoCardH(
-                      item: item,
-                      index: index,
-                      ctr: ctr,
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    desktopCard(
+                      FavVideoCardH(
+                        item: item,
+                        index: index,
+                        ctr: ctr,
+                      ),
                     ),
                   );
                 },

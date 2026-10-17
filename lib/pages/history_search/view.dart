@@ -36,17 +36,21 @@ class _HistorySearchPageState
             controller.onLoadMore();
           }
           final item = list[index];
-          return desktopCard(
-            HistoryItem(
-              item: item,
-              ctr: controller,
-              onDelete: (kid, business) =>
-                  controller.onDelHistory(index, kid, business),
+          // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+          return gridDelegate.scaled(
+            desktopCard(
+              HistoryItem(
+                item: item,
+                ctr: controller,
+                onDelete: (kid, business) =>
+                    controller.onDelHistory(index, kid, business),
+              ),
             ),
           );
         },
         itemCount: list.length,
       ),
+      maxWidth: double.infinity,
     );
   }
 }

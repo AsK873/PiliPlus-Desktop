@@ -39,11 +39,12 @@ class _FavCheesePageState extends State<FavCheesePage>
               top: 7,
               bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
             ),
-            // 桌面端内容限宽居中（默认 1480 = Style.contentMaxWidth）
+            // 与首页网格一致：卡片网格不限宽、列数按可用宽度动态决定
             sliver: desktopLimitSliver(
               Obx(
                 () => _buildBody(theme, _controller.loadingState.value),
               ),
+              maxWidth: double.infinity,
             ),
           ),
         ],
@@ -66,13 +67,16 @@ class _FavCheesePageState extends State<FavCheesePage>
                     _controller.onLoadMore();
                   }
                   final item = response[index];
-                  return MemberCheeseItem(
-                    item: item,
-                    onRemove: () => showConfirmDialog(
-                      context: context,
-                      title: const Text('确定取消收藏该课堂？'),
-                      onConfirm: () =>
-                          _controller.onRemove(index, item.seasonId!),
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    MemberCheeseItem(
+                      item: item,
+                      onRemove: () => showConfirmDialog(
+                        context: context,
+                        title: const Text('确定取消收藏该课堂？'),
+                        onConfirm: () =>
+                            _controller.onRemove(index, item.seasonId!),
+                      ),
                     ),
                   );
                 },

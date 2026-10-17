@@ -29,6 +29,27 @@ class ImmediateTapGestureRecognizer extends OneSequenceGestureRecognizer {
   bool _wonArena = false;
   Offset? _initialPosition;
 
+  /// 判定「仍是点击」的最大允许漂移（逻辑像素）。
+  ///
+  /// 取 Flutter 的标准点击容差 [kTouchSlop]（18），与 `TapGestureRecognizer` 在
+  /// 无 gestureSettings 时的默认口径一致：「按下到抬起之间指针漂移不超过一个标准
+  /// 点击容差，就还算一次点击」。
+  ///
+  /// 修复前这里写的是 `distanceSquared > 4.0`，即**从按下点起的累计位移**超过
+  /// 2 逻辑像素就直接 reject。这个量级最初（a2d5ecc51）是用来判断**单个
+  /// PointerMove 事件的位移**（`event.delta.distanceSquared`）的，923af32c9 改成
+  /// 累计位移后量级被放大成「整段点击」，于是鼠标点击时手部 2 像素以上的自然
+  /// 抖动都会被判成「拖动」，`resolve(rejected)` + `stopTrackingPointer()` 之后
+  /// 本次手势出局，抬起时不再触发 `onTapUp` —— 即「点击偶尔无反应」。
+  static const double _kMaxTapDrift = kTouchSlop;
+
+  static bool _withinTapDrift(Offset? initial, Offset current) {
+    if (initial == null) {
+      return true;
+    }
+    return (current - initial).distance <= _kMaxTapDrift;
+  }
+
   @override
   bool isPointerPanZoomAllowed(PointerPanZoomStartEvent event) => false;
 
@@ -79,7 +100,11 @@ class ImmediateTapGestureRecognizer extends OneSequenceGestureRecognizer {
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
-    if ((event.position - _initialPosition!).distanceSquared > 4.0) {
+    // 与 Flutter `TapGestureRecognizer` 的容差口径一致：从按下点起的累计漂移
+    // 超过一个标准点击容差（kTouchSlop）才认为「这不是点击」。
+    // 注意这里是**累计**位移（不是单个 move 事件的 delta），且阈值必须是点击
+    // 容差量级，否则鼠标点击时的手部抖动会被误判成拖动（见 [_kMaxTapDrift]）。
+    if (!_withinTapDrift(_initialPosition, event.position)) {
       resolve(GestureDisposition.rejected);
       stopTrackingPointer(event.pointer);
     }

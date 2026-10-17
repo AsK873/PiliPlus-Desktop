@@ -44,6 +44,7 @@ import 'package:PiliPlus/plugin/pl_player/models/gesture_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/video_fit_type.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/fullscreen.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/app_bar_ani.dart';
+import 'package:PiliPlus/plugin/pl_player/widgets/abortable_long_press_recognizer.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/backward_seek.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/bottom_control.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/common_btn.dart';
@@ -378,7 +379,13 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     removeObserverMobile(this);
     _danmakuListener?.cancel();
     _tapGestureRecognizer.dispose();
-    _longPressRecognizer?.dispose();
+    final longPressRecognizer = _longPressRecognizer;
+    if (longPressRecognizer != null) {
+      // 先注销：避免控制器仍持有已 dispose 的识别器
+      plPlayerController.unregisterSpeedRecognizer(longPressRecognizer);
+      // dispose 会取消 deadline 定时器，旧 State 不会留下 active pointer
+      longPressRecognizer.dispose();
+    }
     _doubleTapGestureRecognizer.dispose();
     _scaleGestureRecognizer.dispose();
     _brightnessListener?.cancel();
@@ -490,6 +497,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         () {
           final type = plPlayerController.superResolutionType.value;
           return PopupMenuButton<SuperResolutionType>(
+            onOpened: () => plPlayerController.setPipMenuShowing(true),
+            onCanceled: () => plPlayerController.setPipMenuShowing(false),
+            onSelected: (_) => plPlayerController.setPipMenuShowing(false),
             tooltip: '超分辨率',
             requestFocus: false,
             initialValue: type,
@@ -614,6 +624,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         () {
           final fit = plPlayerController.videoFit.value;
           return PopupMenuButton<VideoFitType>(
+            onOpened: () => plPlayerController.setPipMenuShowing(true),
+            onCanceled: () => plPlayerController.setPipMenuShowing(false),
+            onSelected: (_) => plPlayerController.setPipMenuShowing(false),
             tooltip: '画面比例',
             requestFocus: false,
             initialValue: fit,
@@ -653,10 +666,15 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
           final list = videoDetailController.languages.value;
           if (list != null && list.isNotEmpty) {
             return PopupMenuButton<String>(
+              onOpened: () => plPlayerController.setPipMenuShowing(true),
+              onCanceled: () => plPlayerController.setPipMenuShowing(false),
               tooltip: '翻译',
               requestFocus: false,
               initialValue: videoDetailController.currLang.value,
-              onSelected: videoDetailController.setLanguage,
+              onSelected: (value) {
+                plPlayerController.setPipMenuShowing(false);
+                videoDetailController.setLanguage(value);
+              },
               color: Colors.black.withValues(alpha: 0.8),
               itemBuilder: (context) => [
                 const PopupMenuItem<String>(
@@ -700,6 +718,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             final val = videoDetailController.vttSubtitlesIndex.value;
             return PopupMenuButton<int>(
               tooltip: '字幕',
+              onOpened: () => plPlayerController.setPipMenuShowing(true),
+              onCanceled: () => plPlayerController.setPipMenuShowing(false),
+              onSelected: (_) => plPlayerController.setPipMenuShowing(false),
               requestFocus: false,
               initialValue: val,
               color: Colors.black.withValues(alpha: 0.8),
@@ -756,6 +777,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       /// 播放速度
       BottomControlType.speed => Obx(
         () => PopupMenuButton<double>(
+          onOpened: () => plPlayerController.setPipMenuShowing(true),
+          onCanceled: () => plPlayerController.setPipMenuShowing(false),
+          onSelected: (_) => plPlayerController.setPipMenuShowing(false),
           tooltip: '倍速',
           requestFocus: false,
           initialValue: plPlayerController.playbackSpeed,
@@ -803,6 +827,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
           final availableQa = videoInfo.dash!.video!.availableVideoQualities;
           return PopupMenuButton<int>(
             tooltip: '画质',
+            onOpened: () => plPlayerController.setPipMenuShowing(true),
+            onCanceled: () => plPlayerController.setPipMenuShowing(false),
+            onSelected: (_) => plPlayerController.setPipMenuShowing(false),
             requestFocus: false,
             initialValue: currentVideoQa.code,
             color: Colors.black.withValues(alpha: 0.8),
@@ -980,10 +1007,28 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   late double maxWidth;
   late double maxHeight;
 
+  /// 上一次 MediaQuery 尺寸：用于在 [didChangeDependencies] 里识别「窗口尺寸/最大化变化」。
+  Size? _lastViewSize;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     colorScheme = ColorScheme.of(context);
+    // 窗口尺寸 / 最大化状态变化会让 MediaQuery 变化并重建播放器。
+    // 长按倍速（长按 = 临时加速）不允许跨越窗口尺寸变化继续生效：一旦松开事件
+    // 在窗口状态切换（最大化 / 还原）中丢失，播放速度会永久停在长按倍速上
+    // （实测：长按 3× 后丢失松手 ⇒ 一直 3×）。这里做一次幂等收尾，
+    // 恢复到「长按前的正常速度」；不在长按中时该调用无任何副作用。
+    final size = MediaQuery.sizeOf(context);
+    if (size != _lastViewSize) {
+      _lastViewSize = size;
+      // 窗口尺寸变化（最大化/还原/缩放）是手势边界：
+      // 1) 记录给「窗口输入稳定期」——紧随其后的合成 PointerDown 不再 arm 长按；
+      // 2) 交由控制器真正中止本次长按（取消 deadline 定时器），并幂等收尾
+      plPlayerController
+        ..markWindowChanged()
+        ..notifySpeedViewSizeChanged();
+    }
   }
 
   @override
@@ -1042,6 +1087,8 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   }
 
   void _onPanUpdate(ScaleUpdateDetails details) {
+    // PiP 下拖动已用于移动窗口，不再进入快进/亮度/音量分支。
+    if (plPlayerController.isDesktopPip) return;
     if (_gestureType == null) {
       final cumulativeDelta = details.localFocalPoint - _initialFocalPoint!;
       if (cumulativeDelta.distanceSquared < 1) return;
@@ -1251,9 +1298,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     }
   }
 
-  LongPressGestureRecognizer? _longPressRecognizer;
-  LongPressGestureRecognizer get longPressRecognizer => _longPressRecognizer ??=
-      LongPressGestureRecognizer(
+  AbortableLongPressRecognizer? _longPressRecognizer;
+  AbortableLongPressRecognizer get longPressRecognizer => _longPressRecognizer ??=
+      AbortableLongPressRecognizer(
           duration: plPlayerController.enableTapDm
               ? const Duration(milliseconds: 300)
               : null,
@@ -1286,6 +1333,8 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   (bool, bool)? _pendingFullScreenToggle;
 
   void _onPointerDown(PointerDownEvent event) {
+    // PiP：按下期间不自动隐藏控制栏（setPipPointerDown 内部限定 PiP）
+    plPlayerController.setPipPointerDown(event.buttons == kPrimaryButton);
     if (PlatformUtils.isDesktop) {
       final buttons = event.buttons;
       final isSecondaryBtn = buttons == kSecondaryMouseButton;
@@ -1295,13 +1344,20 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       }
     }
 
+    final windowSettle = plPlayerController.isWithinWindowInputSettle();
     final controlsUnlock = !plPlayerController.controlsLock.value;
     if (PlatformUtils.isMobile) {
       _tapGestureRecognizer.addPointer(event);
       if (controlsUnlock) {
         if (!plPlayerController.isLive) {
           _doubleTapGestureRecognizer.addPointer(event);
-          longPressRecognizer.addPointer(event);
+          // 窗口状态刚变化时（输入稳定期内）不 arm 长按：这类 down 的 up 会被
+          // 窗口状态切换吞掉，arm 后 500ms deadline 必然误触发（实测 3×）
+          if (!windowSettle) {
+            // 登记：窗口尺寸变化时按手势边界中止这次长按（取消 deadline 定时器）
+            plPlayerController.registerSpeedRecognizer(longPressRecognizer);
+            longPressRecognizer.addPointer(event);
+          }
         }
         _scaleGestureRecognizer
           ..isPosAllowed = _isPositionAllowed(event.localPosition)
@@ -1313,13 +1369,21 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       } else {
         _tapGestureRecognizer.addPointer(event);
         _doubleTapGestureRecognizer.addPointer(event);
-        longPressRecognizer.addPointer(event);
+        // 窗口状态刚变化时（输入稳定期内）不 arm 长按（同上）
+        if (!windowSettle) {
+          // 登记：窗口尺寸变化时按手势边界中止这次长按（取消 deadline 定时器）
+          plPlayerController.registerSpeedRecognizer(longPressRecognizer);
+          longPressRecognizer.addPointer(event);
+        }
       }
       _scaleGestureRecognizer.addPointer(event);
     }
   }
 
   void _onPointerUp(PointerUpEvent event) {
+    plPlayerController
+      ..setPipPointerDown(false)
+      ..notifySpeedPointerUpOrCancel();
     final pending = _pendingFullScreenToggle;
     if (pending == null || event.buttons != 0) {
       return;
@@ -1337,6 +1401,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   }
 
   void _onPointerCancel(PointerCancelEvent event) {
+    plPlayerController
+      ..setPipPointerDown(false)
+      ..notifySpeedPointerUpOrCancel();
     _pendingFullScreenToggle = null;
   }
 
@@ -1675,7 +1742,11 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                       child: plPlayerController.isDesktopPip
                           ? GestureDetector(
                               behavior: HitTestBehavior.translucent,
-                              onPanStart: (_) => windowManager.startDragging(),
+                              onPanStart: (_) {
+                                // PiP：拖动期间保持控制栏可见（结束时由窗口事件恢复计时）
+                                plPlayerController.cancelAutoHide();
+                                windowManager.startDragging();
+                              },
                               child: widget.headerControl,
                             )
                           : widget.headerControl,
@@ -2090,8 +2161,14 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
               : MouseCursor.defer,
           onEnter: (_) => plPlayerController.controls = true,
           onHover: (_) => plPlayerController.controls = true,
-          onExit: (_) => plPlayerController.controls =
-              widget.videoDetailController?.showSteinEdgeInfo.value ?? false,
+          onExit: (_) {
+            plPlayerController.controls =
+                plPlayerController.controlsPinned ||
+                (widget.videoDetailController?.showSteinEdgeInfo.value ?? false);
+            // 指针离开播放器区域：长按不可能继续，作废并幂等收尾，
+            // 避免「指针移出窗口后才松开」导致的速度停留在长按倍速上
+            plPlayerController.notifySpeedPointerExited();
+          },
           child: child,
         ),
       );

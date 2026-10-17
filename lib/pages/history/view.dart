@@ -256,11 +256,12 @@ class _HistoryPageState extends State<HistoryPage>
                   ? 24
                   : padding.bottom + 100,
             ),
-            // 桌面端内容限宽居中（默认 1480 = Style.contentMaxWidth）
+            // 与首页网格一致：卡片网格不限宽、列数按可用宽度动态决定
             sliver: desktopLimitSliver(
               Obx(
                 () => _buildBody(_historyController.loadingState.value),
               ),
+              maxWidth: double.infinity,
             ),
           ),
         ],
@@ -436,12 +437,15 @@ class _HistoryPageState extends State<HistoryPage>
                     _historyController.onLoadMore();
                   }
                   final item = response[index];
-                  return desktopCard(
-                    HistoryItem(
-                      item: item,
-                      ctr: _historyController,
-                      onDelete: (kid, business) =>
-                          _historyController.delHistory(item),
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    desktopCard(
+                      HistoryItem(
+                        item: item,
+                        ctr: _historyController,
+                        onDelete: (kid, business) =>
+                            _historyController.delHistory(item),
+                      ),
                     ),
                   );
                 },
@@ -492,6 +496,7 @@ class _HistoryPageState extends State<HistoryPage>
             ),
             sliver: desktopLimitSliver(
               _buildSearchBody(ctr, ctr.loadingState.value),
+              maxWidth: double.infinity,
             ),
           ),
         ],
@@ -515,12 +520,15 @@ class _HistoryPageState extends State<HistoryPage>
                     ctr.onLoadMore();
                   }
                   final item = response[index];
-                  return desktopCard(
-                    HistoryItem(
-                      item: item,
-                      ctr: ctr,
-                      onDelete: (kid, business) =>
-                          ctr.onDelHistory(index, kid, business),
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    desktopCard(
+                      HistoryItem(
+                        item: item,
+                        ctr: ctr,
+                        onDelete: (kid, business) =>
+                            ctr.onDelHistory(index, kid, business),
+                      ),
                     ),
                   );
                 },

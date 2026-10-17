@@ -46,22 +46,25 @@ class _MemberHomeState extends State<MemberHome>
     return _buildBody(_ctr.loadingState.value);
   }
 
-  late final gridDelegateV = SliverGridDelegateWithExtentAndRatio(
+  /// 桌面端与首页同一算式（动态列数 + 整卡同比，见 [CardGridDelegate]）；
+  /// 非桌面端逐字沿用原口径（`baseCardWidth` = 原 `maxCrossAxisExtent`）。
+  late final gridDelegateV = CardGridDelegate(
+    baseCardWidth: Grid.smallCardWidth,
+    baseContentExtent: MediaQuery.textScalerOf(context).scale(55),
     mainAxisSpacing: Style.cardSpace,
     crossAxisSpacing: Style.cardSpace,
-    maxCrossAxisExtent: Grid.smallCardWidth,
     childAspectRatio: Style.aspectRatio,
-    mainAxisExtent: MediaQuery.textScalerOf(context).scale(55),
   );
 
+  /// 横向卡片网格（`Grid.videoCardHDelegate()` 已自带桌面端动态列数 + 整卡同比）。
   late final gridDelegateAudio = Grid.videoCardHDelegate();
 
-  late final gridDelegatePgc = SliverGridDelegateWithExtentAndRatio(
+  late final gridDelegatePgc = CardGridDelegate(
+    baseCardWidth: Grid.smallCardWidth * 0.6,
+    baseContentExtent: MediaQuery.textScalerOf(context).scale(52),
     mainAxisSpacing: Style.cardSpace,
     crossAxisSpacing: Style.cardSpace,
-    maxCrossAxisExtent: Grid.smallCardWidth * 0.6,
     childAspectRatio: 0.75,
-    mainAxisExtent: MediaQuery.textScalerOf(context).scale(52),
   );
 
   Widget _buildBody(LoadingState<SpaceData?> loadingState) {
@@ -91,8 +94,12 @@ class _MemberHomeState extends State<MemberHome>
                       sliver: SliverGrid.builder(
                         gridDelegate: gridDelegateV,
                         itemBuilder: (context, index) {
-                          return VideoCardVMemberHome(
-                            videoItem: res.archive!.item![index],
+                          // gridDelegateV.scaled = 卡片文字随本列实际列宽同比
+                          // （非桌面端原样返回）
+                          return gridDelegateV.scaled(
+                            VideoCardVMemberHome(
+                              videoItem: res.archive!.item![index],
+                            ),
                           );
                         },
                         itemCount: min(
@@ -134,8 +141,10 @@ class _MemberHomeState extends State<MemberHome>
                       sliver: SliverGrid.builder(
                         gridDelegate: gridDelegateV,
                         itemBuilder: (context, index) {
-                          return VideoCardVMemberHome(
-                            videoItem: res.coinArchive!.item![index],
+                          return gridDelegateV.scaled(
+                            VideoCardVMemberHome(
+                              videoItem: res.coinArchive!.item![index],
+                            ),
                           );
                         },
                         itemCount: min(
@@ -160,8 +169,10 @@ class _MemberHomeState extends State<MemberHome>
                       sliver: SliverGrid.builder(
                         gridDelegate: gridDelegateV,
                         itemBuilder: (context, index) {
-                          return VideoCardVMemberHome(
-                            videoItem: res.likeArchive!.item![index],
+                          return gridDelegateV.scaled(
+                            VideoCardVMemberHome(
+                              videoItem: res.likeArchive!.item![index],
+                            ),
                           );
                         },
                         itemCount: min(
@@ -199,8 +210,8 @@ class _MemberHomeState extends State<MemberHome>
                     SliverGrid.builder(
                       gridDelegate: gridDelegateAudio,
                       itemBuilder: (context, index) {
-                        return MemberAudioItem(
-                          item: res.audios!.item![index],
+                        return gridDelegateAudio.scaled(
+                          MemberAudioItem(item: res.audios!.item![index]),
                         );
                       },
                       itemCount: isVertical ? 1 : min(3, res.audios!.count!),
@@ -217,7 +228,9 @@ class _MemberHomeState extends State<MemberHome>
                     SliverGrid.builder(
                       gridDelegate: gridDelegate,
                       itemBuilder: (context, index) {
-                        return MemberComicItem(item: res.comic!.item![index]);
+                        return gridDelegate.scaled(
+                          MemberComicItem(item: res.comic!.item![index]),
+                        );
                       },
                       itemCount: isVertical ? 1 : min(3, res.comic!.count!),
                     ),
@@ -237,8 +250,10 @@ class _MemberHomeState extends State<MemberHome>
                       sliver: SliverGrid.builder(
                         gridDelegate: gridDelegatePgc,
                         itemBuilder: (context, index) {
-                          return PgcCardVMemberPgc(
-                            item: res.season!.item![index],
+                          return gridDelegatePgc.scaled(
+                            PgcCardVMemberPgc(
+                              item: res.season!.item![index],
+                            ),
                           );
                         },
                         itemCount: min(

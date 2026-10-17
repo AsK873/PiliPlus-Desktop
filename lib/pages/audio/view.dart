@@ -711,26 +711,35 @@ class _AudioPageState extends State<AudioPage> {
             ),
           ),
           Obx(
-            () => ActionItem(
-              animation: _controller.tripleAnimation,
-              icon: const Icon(FontAwesomeIcons.star),
-              selectIcon: const Icon(
-                FontAwesomeIcons.solidStar,
-              ),
-              onTap: () => _controller.showFavBottomSheet(context),
-              // 桌面端长按 = 无动作（收藏面板仍由点击打开）
-              onLongPress: PlatformUtils.isMobile
-                  ? () => _controller.showFavBottomSheet(
-                      context,
-                      isLongPress: true,
-                    )
-                  : null,
-              selectStatus: _controller.hasFav.value,
-              semanticsLabel: '收藏',
-              text: NumUtils.numFormat(
-                audioItem.stat.favourite,
-              ),
-            ),
+            () {
+              // 响应式状态必须在 Obx 回调内读取（否则 Obx 追踪不到依赖会报
+              // "improper use of a GetX"）；Builder 仅用于取按钮自身的
+              // BuildContext 作为桌面端 Popover 的定位锚点。
+              final hasFav = _controller.hasFav.value;
+              return Builder(
+                builder: (btnContext) => ActionItem(
+                  animation: _controller.tripleAnimation,
+                  icon: const Icon(FontAwesomeIcons.star),
+                  selectIcon: const Icon(
+                    FontAwesomeIcons.solidStar,
+                  ),
+                  // 短按：开启快速收藏时收藏至默认夹，否则打开收藏夹 Popover
+                  onTap: () => _controller.showFavBottomSheet(btnContext),
+                  // 长按：仅在开启「快速收藏」时绑定（打开收藏夹 Popover）
+                  onLongPress: _controller.enableQuickFav
+                      ? () => _controller.showFavBottomSheet(
+                          btnContext,
+                          isLongPress: true,
+                        )
+                      : null,
+                  selectStatus: hasFav,
+                  semanticsLabel: '收藏',
+                  text: NumUtils.numFormat(
+                    audioItem.stat.favourite,
+                  ),
+                ),
+              );
+            },
           ),
           ActionItem(
             icon: const Icon(FontAwesomeIcons.comment),

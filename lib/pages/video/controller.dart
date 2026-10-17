@@ -1165,7 +1165,11 @@ class VideoDetailController extends GetxController
 
       if (response.subtitle?.subtitles case final sub? when (sub.isNotEmpty)) {
         _setSubtitle(sub);
-      } else if (!Accounts.main.isLogin) {
+      } else if (aid != 0) {
+        // 主源（/x/player/wbi/v2 的 subtitle）为空时才走 App gRPC 兜底：
+        // 兜底不再限定未登录账号（原条件 !Accounts.main.isLogin 会让已登录用户
+        // 在主源为空的视频上永远拿不到字幕轨道）；aid 为 0（如部分 PGC 剧集）
+        // 时不请求，避免 pid=0 触发 grpc 报错并弹出 toast。
         final res = await DmGrpc.dmView(aid, cid.value);
         if (res case Success(:final response)) {
           if (response.hasSubtitle() &&

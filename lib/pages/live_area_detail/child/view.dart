@@ -68,12 +68,14 @@ class _LiveAreaChildPageState extends State<LiveAreaChildPage>
     );
   }
 
-  late final gridDelegate = SliverGridDelegateWithExtentAndRatio(
+  /// 桌面端与首页同一算式（动态列数 + 整卡同比，见 [CardGridDelegate]）；
+  /// 非桌面端逐字沿用原口径（`baseCardWidth` = 原 `maxCrossAxisExtent`）。
+  late final gridDelegate = CardGridDelegate(
+    baseCardWidth: Grid.smallCardWidth,
+    baseContentExtent: MediaQuery.textScalerOf(context).scale(90),
     mainAxisSpacing: Style.cardSpace,
     crossAxisSpacing: Style.cardSpace,
-    maxCrossAxisExtent: Grid.smallCardWidth,
     childAspectRatio: Style.aspectRatio,
-    mainAxisExtent: MediaQuery.textScalerOf(context).scale(90),
   );
 
   Widget _buildBody(
@@ -125,9 +127,12 @@ class _LiveAreaChildPageState extends State<LiveAreaChildPage>
                     if (index == response.length - 1) {
                       _controller.onLoadMore();
                     }
-                    return LiveCardVApp(
-                      item: response[index],
-                      showFirstFrame: widget.showFirstFrame,
+                    // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                    return gridDelegate.scaled(
+                      LiveCardVApp(
+                        item: response[index],
+                        showFirstFrame: widget.showFirstFrame,
+                      ),
                     );
                   },
                   itemCount: response.length,

@@ -2,6 +2,7 @@ import 'package:PiliPlus/common/skeleton/video_reply.dart';
 import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/colored_box_transition.dart';
+import 'package:PiliPlus/common/widgets/desktop/desktop_tokens.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/scaffold/mini_scaffold.dart';
@@ -19,6 +20,8 @@ import 'package:PiliPlus/utils/app_scheme.dart';
 import 'package:PiliPlus/utils/extension/widget_ext.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/parse_string.dart';
+import 'package:PiliPlus/utils/extension/context_ext.dart';
+import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:fixnum/fixnum.dart' show Int64;
@@ -257,7 +260,13 @@ class _VideoReplyReplyPanelState extends State<VideoReplyReplyPanel>
                 return count != -1
                     ? Text(
                         '相关回复共${NumUtils.numFormat(count)}条',
-                        style: const TextStyle(fontSize: 13),
+                        style: TextStyle(
+                          // 右栏：回复列表头部文字与「数据」同号（移动端保持原有 13）
+                          fontSize: DesktopTokens.replyTextFs(
+                            PlatformUtils.isDesktop && !context.isPortrait,
+                            13,
+                          ),
+                        ),
                       )
                     : const SizedBox.shrink();
               },
@@ -269,7 +278,13 @@ class _VideoReplyReplyPanelState extends State<VideoReplyReplyPanel>
               label: Obx(
                 () => Text(
                   _controller.sortType.value.label,
-                  style: TextStyle(fontSize: 13, color: colorScheme.secondary),
+                  style: TextStyle(
+                    fontSize: DesktopTokens.replyTextFs(
+                      PlatformUtils.isDesktop && !context.isPortrait,
+                      13,
+                    ),
+                    color: colorScheme.secondary,
+                  ),
                 ),
               ),
             ),
@@ -305,7 +320,11 @@ class _VideoReplyReplyPanelState extends State<VideoReplyReplyPanel>
                 _controller.isEnd ? '没有更多了' : '加载中...',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 12,
+                  // 右栏：列表尾部提示文字与「数据」同号（移动端保持原有 12）
+                  fontSize: DesktopTokens.replyTextFs(
+                    PlatformUtils.isDesktop && !context.isPortrait,
+                    12,
+                  ),
                   color: colorScheme.outline,
                 ),
               ),

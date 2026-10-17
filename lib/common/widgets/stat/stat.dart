@@ -8,12 +8,19 @@ class StatWidget extends StatelessWidget {
   final Color? color;
   final double iconSize;
 
+  /// 数值文字字号（默认 12，与改动前的取值一致）。
+  ///
+  /// 供桌面右栏「整体放大」的卡片按新的元信息基准传入（见
+  /// `pages/video/related/view.dart`）；不传即保持原样，移动端零变化。
+  final double fontSize;
+
   const StatWidget({
     super.key,
     required this.type,
     required this.value,
     this.color,
     this.iconSize = 13,
+    this.fontSize = 12,
   });
 
   @override
@@ -33,7 +40,9 @@ class StatWidget extends StatelessWidget {
         ),
         Text(
           NumUtils.numFormat(value),
-          style: TextStyle(fontSize: 12, color: color),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: fontSize, color: color),
         ),
       ],
     );

@@ -85,22 +85,27 @@ class _DownloadSearchPageState
   @override
   Widget buildList(List<BiliDownloadEntryInfo> list) {
     if (list.isNotEmpty) {
+      // 与首页网格一致：卡片网格不限宽、列数按可用宽度动态决定
       return desktopLimitSliver(
         SliverGrid.builder(
           gridDelegate: gridDelegate,
           itemBuilder: (context, index) {
             final entry = list[index];
-            return DetailItem(
-              entry: entry,
-              progress: widget.progress,
-              downloadService: _downloadService,
-              showTitle: true,
-              onDelete: () => controller.onRemoveSingle(index, entry),
-              controller: controller,
+            // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+            return gridDelegate.scaled(
+              DetailItem(
+                entry: entry,
+                progress: widget.progress,
+                downloadService: _downloadService,
+                showTitle: true,
+                onDelete: () => controller.onRemoveSingle(index, entry),
+                controller: controller,
+              ),
             );
           },
           itemCount: list.length,
         ),
+        maxWidth: double.infinity,
       );
     }
     return const HttpError();

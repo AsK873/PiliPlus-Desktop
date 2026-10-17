@@ -147,7 +147,7 @@ class _DownloadDetailPageState extends State<DownloadDetailPage>
           body: CustomScrollView(
             slivers: [
               ViewSliverSafeArea(
-                // M8：桌面内容限宽居中（下载详情；默认 1480 = Style.contentMaxWidth）
+                // 与首页网格一致：卡片网格不限宽、列数按可用宽度动态决定
                 sliver: desktopLimitSliver(
                   Obx(() {
                     if (_downloadItems.isNotEmpty) {
@@ -155,31 +155,34 @@ class _DownloadDetailPageState extends State<DownloadDetailPage>
                         gridDelegate: gridDelegate,
                         itemBuilder: (context, index) {
                           final entry = _downloadItems[index];
-                          return DetailItem(
-                            entry: entry,
-                            progress: widget.progress,
-                            downloadService: _downloadService,
-                            showTitle: false,
-                            onDelete: () async {
-                              if (_downloadItems.length == 1) {
-                                await _closeSub();
-                                await _downloadService.deletePage(
-                                  pageDirPath: entry.pageDirPath,
-                                );
-                                if (mounted) {
-                                  Get.back();
+                          // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                          return gridDelegate.scaled(
+                            DetailItem(
+                              entry: entry,
+                              progress: widget.progress,
+                              downloadService: _downloadService,
+                              showTitle: false,
+                              onDelete: () async {
+                                if (_downloadItems.length == 1) {
+                                  await _closeSub();
+                                  await _downloadService.deletePage(
+                                    pageDirPath: entry.pageDirPath,
+                                  );
+                                  if (mounted) {
+                                    Get.back();
+                                  }
+                                } else {
+                                  _downloadService.deleteDownload(
+                                    entry: entry,
+                                    removeList: true,
+                                  );
                                 }
-                              } else {
-                                _downloadService.deleteDownload(
-                                  entry: entry,
-                                  removeList: true,
+                                GStorage.watchProgress.delete(
+                                  entry.cid.toString(),
                                 );
-                              }
-                              GStorage.watchProgress.delete(
-                                entry.cid.toString(),
-                              );
-                            },
-                            controller: this,
+                              },
+                              controller: this,
+                            ),
                           );
                         },
                         itemCount: _downloadItems.length,
@@ -187,6 +190,7 @@ class _DownloadDetailPageState extends State<DownloadDetailPage>
                     }
                     return const HttpError();
                   }),
+                  maxWidth: double.infinity,
                 ),
               ),
             ],

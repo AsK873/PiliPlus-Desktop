@@ -69,11 +69,12 @@ class _LaterViewChildPageState extends State<LaterViewChildPage>
                   ? 24
                   : MediaQuery.viewPaddingOf(context).bottom + 85,
             ),
-            // 桌面端内容限宽居中（默认 1480 = Style.contentMaxWidth）
+            // 与首页网格一致：卡片网格不限宽、列数按可用宽度动态决定
             sliver: desktopLimitSliver(
               Obx(
                 () => _buildBody(_laterController.loadingState.value),
               ),
+              maxWidth: double.infinity,
             ),
           ),
         ],
@@ -93,33 +94,36 @@ class _LaterViewChildPageState extends State<LaterViewChildPage>
                     _laterController.onLoadMore();
                   }
                   final videoItem = response[index];
-                  return desktopCard(
-                    VideoCardHLater(
-                      index: index,
-                      videoItem: videoItem,
-                      ctr: _laterController,
-                      onViewLater: (cid) {
-                        PageUtils.toVideoPage(
-                          bvid: videoItem.bvid,
-                          cid: cid,
-                          cover: videoItem.pic,
-                          title: videoItem.title,
-                          dimension: videoItem.dimension,
-                          extraArguments: _baseCtr.isPlayAll.value
-                              ? {
-                                  'oid': videoItem.aid,
-                                  'sourceType': SourceType.watchLater,
-                                  'count': _laterController
-                                      .baseCtr
-                                      .counts[LaterViewType.all.index],
-                                  'favTitle': '稍后再看',
-                                  'mediaId': _laterController.mid,
-                                  'desc': _laterController.asc.value,
-                                  'isContinuePlaying': index != 0,
-                                }
-                              : const {'viewLater': true},
-                        );
-                      },
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    desktopCard(
+                      VideoCardHLater(
+                        index: index,
+                        videoItem: videoItem,
+                        ctr: _laterController,
+                        onViewLater: (cid) {
+                          PageUtils.toVideoPage(
+                            bvid: videoItem.bvid,
+                            cid: cid,
+                            cover: videoItem.pic,
+                            title: videoItem.title,
+                            dimension: videoItem.dimension,
+                            extraArguments: _baseCtr.isPlayAll.value
+                                ? {
+                                    'oid': videoItem.aid,
+                                    'sourceType': SourceType.watchLater,
+                                    'count': _laterController
+                                        .baseCtr
+                                        .counts[LaterViewType.all.index],
+                                    'favTitle': '稍后再看',
+                                    'mediaId': _laterController.mid,
+                                    'desc': _laterController.asc.value,
+                                    'isContinuePlaying': index != 0,
+                                  }
+                                : const {'viewLater': true},
+                          );
+                        },
+                      ),
                     ),
                   );
                 },

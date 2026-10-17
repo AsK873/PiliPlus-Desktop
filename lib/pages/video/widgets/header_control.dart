@@ -1770,7 +1770,8 @@ class HeaderControlState extends State<HeaderControl>
               title,
               // show current datetime
               ...?timeBatteryWidgets,
-              if (PlatformUtils.isDesktop && !plPlayerController.isDesktopPip)
+              // 置顶：桌面端通用（PiP 内同样可用）
+              if (PlatformUtils.isDesktop)
                 Obx(() {
                   final isAlwaysOnTop = plPlayerController.isAlwaysOnTop.value;
                   return SizedBox(
@@ -1792,6 +1793,26 @@ class HeaderControlState extends State<HeaderControl>
                               Icons.push_pin_outlined,
                               color: Colors.white,
                             ),
+                    ),
+                  );
+                }),
+              // 比例锁：仅 PiP 内提供，默认锁定（等比缩放）
+              if (PlatformUtils.isDesktop && plPlayerController.isDesktopPip)
+                Obx(() {
+                  final lock = plPlayerController.pipLockAspectRatio.value;
+                  return SizedBox(
+                    width: btnWidth,
+                    height: btnHeight,
+                    child: IconButton(
+                      style: btnStyle,
+                      tooltip: lock ? '自由缩放' : '锁定比例',
+                      onPressed: () =>
+                          plPlayerController.setPipLockAspectRatio(!lock),
+                      icon: Icon(
+                        lock ? Icons.aspect_ratio : Icons.aspect_ratio_outlined,
+                        size: 19,
+                        color: Colors.white,
+                      ),
                     ),
                   );
                 }),
@@ -2040,25 +2061,35 @@ class HeaderControlState extends State<HeaderControl>
                   width: btnWidth,
                   height: btnHeight,
                   child: Obx(
-                    () => ActionItem(
-                      expand: false,
-                      animation: introController.tripleAnimation,
-                      icon: const Icon(
-                        FontAwesomeIcons.star,
-                        color: Colors.white,
-                      ),
-                      selectIcon: const Icon(FontAwesomeIcons.solidStar),
-                      onTap: () => introController.showFavBottomSheet(context),
-                      // 桌面端长按 = 无动作（收藏面板仍由点击打开）
-                      onLongPress: PlatformUtils.isMobile
-                          ? () => introController.showFavBottomSheet(
-                              context,
-                              isLongPress: true,
-                            )
-                          : null,
-                      selectStatus: introController.hasFav.value,
-                      semanticsLabel: '收藏',
-                    ),
+                    () {
+                      // 响应式状态必须在 Obx 回调内读取（否则 Obx 追踪不到依赖会报
+                      // "improper use of a GetX"）；Builder 仅用于取按钮自身的
+                      // BuildContext 作为桌面端 Popover 的定位锚点。
+                      final hasFav = introController.hasFav.value;
+                      return Builder(
+                        builder: (btnContext) => ActionItem(
+                          expand: false,
+                          animation: introController.tripleAnimation,
+                          icon: const Icon(
+                            FontAwesomeIcons.star,
+                            color: Colors.white,
+                          ),
+                          selectIcon: const Icon(FontAwesomeIcons.solidStar),
+                          // 短按：开启快速收藏时收藏至默认夹，否则打开收藏夹 Popover
+                          onTap: () =>
+                              introController.showFavBottomSheet(btnContext),
+                          // 长按：仅在开启「快速收藏」时绑定（打开收藏夹 Popover）
+                          onLongPress: introController.enableQuickFav
+                              ? () => introController.showFavBottomSheet(
+                                  btnContext,
+                                  isLongPress: true,
+                                )
+                              : null,
+                          selectStatus: hasFav,
+                          semanticsLabel: '收藏',
+                        ),
+                      );
+                    },
                   ),
                 ),
                 SizedBox(

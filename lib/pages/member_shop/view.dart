@@ -1,6 +1,7 @@
 import 'package:PiliPlus/common/skeleton/space_opus.dart';
 import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
 import 'package:PiliPlus/common/style.dart';
+import 'package:PiliPlus/common/widgets/desktop/desktop_card_scale.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/http/loading_state.dart';
@@ -67,6 +68,7 @@ class _MemberShopState extends State<MemberShop>
   @override
   bool get wantKeepAlive => true;
 
+  /// 桌面端列数与列宽自适应（与首页同一列数算式）；非桌面端几何零变化。
   late final gridDelegate = SliverWaterfallFlowDelegateWithMaxCrossAxisExtent(
     maxCrossAxisExtent: Grid.smallCardWidth,
     mainAxisSpacing: Style.safeSpace,
@@ -91,7 +93,11 @@ class _MemberShopState extends State<MemberShop>
           gridDelegate: gridDelegate,
           delegate: SliverChildBuilderDelegate(
             (_, index) {
-              return MemberShopItem(item: response[index]);
+              // 桌面端卡片文字随本列实际列宽同比（非桌面端原样返回）
+              return DesktopCardScaleBox(
+                baseCardWidth: Grid.smallCardWidth,
+                child: MemberShopItem(item: response[index]),
+              );
             },
             childCount: response.length,
           ),

@@ -1,6 +1,7 @@
 import 'package:PiliPlus/common/skeleton/space_opus.dart';
 import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
 import 'package:PiliPlus/common/style.dart';
+import 'package:PiliPlus/common/widgets/desktop/desktop_card_scale.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
@@ -132,6 +133,8 @@ class _MemberOpusState extends State<MemberOpus>
     );
   }
 
+  /// 桌面端列数与列宽自适应（见 [SliverWaterfallFlowDelegateWithMaxCrossAxisExtent]，
+  /// 与首页同一列数算式）；卡片高度仍由内容决定。非桌面端几何零变化。
   late final gridDelegate = SliverWaterfallFlowDelegateWithMaxCrossAxisExtent(
     maxCrossAxisExtent: Grid.smallCardWidth,
     mainAxisSpacing: Style.safeSpace,
@@ -156,7 +159,11 @@ class _MemberOpusState extends State<MemberOpus>
                     if (index == response.length - 1) {
                       _controller.onLoadMore();
                     }
-                    return SpaceOpusItem(item: response[index]);
+                    // 桌面端卡片文字随本列实际列宽同比（非桌面端原样返回）
+                    return DesktopCardScaleBox(
+                      baseCardWidth: Grid.smallCardWidth,
+                      child: SpaceOpusItem(item: response[index]),
+                    );
                   },
                   childCount: response.length,
                 ),

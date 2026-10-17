@@ -46,16 +46,20 @@ class _SearchLivePanelState
     );
   }
 
-  late final gridDelegate = SliverGridDelegateWithExtentAndRatio(
-    maxCrossAxisExtent: Grid.smallCardWidth,
+  /// 桌面端与首页同一算式（动态列数 + 整卡同比，见 [CardGridDelegate]）；
+  /// 非桌面端逐字沿用原口径（`baseCardWidth` = 原 `maxCrossAxisExtent`）。
+  late final gridDelegate = CardGridDelegate(
+    baseCardWidth: Grid.smallCardWidth,
+    baseContentExtent: MediaQuery.textScalerOf(context).scale(80),
     crossAxisSpacing: Style.cardSpace,
     mainAxisSpacing: Style.cardSpace,
     childAspectRatio: Style.aspectRatio,
-    mainAxisExtent: MediaQuery.textScalerOf(context).scale(80),
   );
 
   @override
   Widget buildList(List<SearchLiveItemModel> list) {
+    // 与首页网格同一几何：卡片网格不限宽（铺满 Sidebar 右侧可用宽度），
+    // 列数按可用宽度动态决定、卡片整卡同比缩放。
     return desktopLimitSliver(
       SliverPadding(
         padding: const .only(left: Style.safeSpace, right: Style.safeSpace),
@@ -65,11 +69,13 @@ class _SearchLivePanelState
             if (index == list.length - 1) {
               controller.onLoadMore();
             }
-            return LiveItem(liveItem: list[index]);
+            // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+            return gridDelegate.scaled(LiveItem(liveItem: list[index]));
           },
           itemCount: list.length,
         ),
       ),
+      maxWidth: double.infinity,
     );
   }
 

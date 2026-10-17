@@ -514,10 +514,13 @@ class _FavDetailPageState extends State<FavDetailPage> with GridMixin {
                     );
                   }
                   FavDetailItemModel item = response[index];
-                  return FavVideoCardH(
-                    item: item,
-                    index: index,
-                    ctr: _favDetailController,
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    FavVideoCardH(
+                      item: item,
+                      index: index,
+                      ctr: _favDetailController,
+                    ),
                   );
                 },
                 itemCount: response.length + 1,

@@ -70,12 +70,14 @@ class _MemberLikeArcPageState extends State<MemberLikeArcPage> {
     );
   }
 
-  late final gridDelegate = SliverGridDelegateWithExtentAndRatio(
+  /// 桌面端与首页同一算式（动态列数 + 整卡同比，见 [CardGridDelegate]）；
+  /// 非桌面端逐字沿用原口径（`baseCardWidth` = 原 `maxCrossAxisExtent`）。
+  late final gridDelegate = CardGridDelegate(
+    baseCardWidth: Grid.smallCardWidth,
+    baseContentExtent: MediaQuery.textScalerOf(context).scale(75),
     mainAxisSpacing: Style.cardSpace,
     crossAxisSpacing: Style.cardSpace,
-    maxCrossAxisExtent: Grid.smallCardWidth,
     childAspectRatio: Style.aspectRatio,
-    mainAxisExtent: MediaQuery.textScalerOf(context).scale(75),
   );
 
   Widget _buildBody(LoadingState<List<CoinLikeArcItem>?> loadingState) {
@@ -96,7 +98,10 @@ class _MemberLikeArcPageState extends State<MemberLikeArcPage> {
                   if (index == response.length - 1) {
                     _ctr.onLoadMore();
                   }
-                  return MemberCoinLikeItem(item: response[index]);
+                  // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                  return gridDelegate.scaled(
+                    MemberCoinLikeItem(item: response[index]),
+                  );
                 },
               )
             : HttpError(onReload: _ctr.onReload),

@@ -172,17 +172,20 @@ class _MemberFavoriteState extends State<MemberFavorite>
               itemCount: list.length,
               itemBuilder: (context, index) {
                 final item = list[index];
-                return SizedBox(
-                  height: 110,
-                  child: MemberFavItem(
-                    item: item,
-                    onDelete: (isDeleted) {
-                      if (isDeleted ?? false) {
-                        _controller.favState
-                          ..value.mediaListResponse?.list?.remove(item)
-                          ..refresh();
-                      }
-                    },
+                // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                return gridDelegate.scaled(
+                  SizedBox(
+                    height: 110,
+                    child: MemberFavItem(
+                      item: item,
+                      onDelete: (isDeleted) {
+                        if (isDeleted ?? false) {
+                          _controller.favState
+                            ..value.mediaListResponse?.list?.remove(item)
+                            ..refresh();
+                        }
+                      },
+                    ),
                   ),
                 );
               },

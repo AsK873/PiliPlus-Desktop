@@ -112,6 +112,8 @@ mixin SearchVideoPanelMixin<S extends SearchVideoPanel>
 
   @override
   Widget buildList(List<SearchVideoItemModel> list) {
+    // 与首页网格同一几何：卡片网格不限宽（铺满 Sidebar 右侧可用宽度），
+    // 列数按可用宽度动态决定、卡片整卡同比缩放（见 Grid.videoCardHDelegate）。
     return desktopLimitSliver(
       SliverGrid.builder(
         gridDelegate: gridDelegate,
@@ -119,17 +121,21 @@ mixin SearchVideoPanelMixin<S extends SearchVideoPanel>
           if (index == list.length - 1) {
             controller.onLoadMore();
           }
-          return desktopCard(
-            VideoCardH(
-              videoItem: list[index],
-              onRemove: () => controller.loadingState
-                ..value.data!.removeAt(index)
-                ..refresh(),
+          // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+          return gridDelegate.scaled(
+            desktopCard(
+              VideoCardH(
+                videoItem: list[index],
+                onRemove: () => controller.loadingState
+                  ..value.data!.removeAt(index)
+                  ..refresh(),
+              ),
             ),
           );
         },
         itemCount: list.length,
       ),
+      maxWidth: double.infinity,
     );
   }
 

@@ -203,7 +203,14 @@ mixin FavMixin on TripleMixin {
   }
 
   // 收藏
-  void showFavBottomSheet(BuildContext context, {bool isLongPress = false}) {
+  //
+  // [anchorContext]：收藏按钮自身的 `BuildContext`（由按钮外层 `Builder` 提供）。
+  // 桌面端收藏夹 Popover 以它为锚点定位；移动端底部面板不使用该参数。
+  void showFavBottomSheet(
+    BuildContext context, {
+    bool isLongPress = false,
+    BuildContext? anchorContext,
+  }) {
     if (!Accounts.main.isLogin) {
       SmartDialog.showToast('账号未登录');
       return;
@@ -211,14 +218,23 @@ mixin FavMixin on TripleMixin {
     // 快速收藏 &
     // 点按 收藏至默认文件夹
     // 长按选择文件夹
+    // 关闭「快速收藏」时长按不绑定动作，因此这里不会收到 isLongPress=true
     if (enableQuickFav) {
       if (!isLongPress) {
         actionFavVideo(isQuick: true);
       } else {
-        PageUtils.showFavBottomSheet(context: context, ctr: this);
+        PageUtils.showFavBottomSheet(
+          context: context,
+          ctr: this,
+          anchorContext: anchorContext,
+        );
       }
     } else if (!isLongPress) {
-      PageUtils.showFavBottomSheet(context: context, ctr: this);
+      PageUtils.showFavBottomSheet(
+        context: context,
+        ctr: this,
+        anchorContext: anchorContext,
+      );
     }
   }
 

@@ -78,7 +78,10 @@ class _MemberSearchChildPageState extends State<MemberSearchChildPage>
                     if (index == response.length - 1) {
                       _controller.onLoadMore();
                     }
-                    return SearchArchiveGrpc(item: response[index]);
+                    // gridDelegate.scaled = 卡片文字随本列实际列宽同比（非桌面端原样返回）
+                    return gridDelegate.scaled(
+                      SearchArchiveGrpc(item: response[index]),
+                    );
                   },
                   itemCount: response.length,
                 ),
