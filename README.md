@@ -18,6 +18,7 @@
 <img src="https://github.com/user-attachments/assets/acb91f16-2d87-4a36-9b8e-085cf094474c" width="49%" />
 
 <img src="https://github.com/user-attachments/assets/3d2a7494-9d44-40e2-957e-01ba99d7e888" width="49%" />
+<img width="2560" height="1392" alt="屏幕截图 2026-10-17 212231" src="https://github.com/user-attachments/assets/2c3d7d14-5a34-4628-94a3-869f46e87d01" />
 
 </p>
 
